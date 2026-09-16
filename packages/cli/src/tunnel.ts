@@ -6,6 +6,12 @@ export interface Funnel {
   stop(): Promise<void>
 }
 
+/** `tailscale` with an optional `--socket` for a tailscaled that runs as your user (TAILSCALE_SOCKET). */
+function tailscale(...args: string[]): string[] {
+  const socket = process.env.TAILSCALE_SOCKET
+  return socket ? ["tailscale", `--socket=${socket}`, ...args] : ["tailscale", ...args]
+}
+
 async function run(cmd: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
   const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" })
   const [stdout, stderr, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited])
@@ -18,7 +24,7 @@ export async function tailscaleAvailable(): Promise<boolean> {
 
 /** DNS name of this machine on its tailnet, without the trailing dot. */
 export async function tailscaleHost(): Promise<string> {
-  const r = await run(["tailscale", "status", "--json"])
+  const r = await run(tailscale("status", "--json"))
   if (r.code !== 0) throw new Error(`tailscale status failed: ${r.stderr.trim() || r.stdout.trim()}`)
   const status = JSON.parse(r.stdout) as { Self?: { DNSName?: string } }
   const dns = status.Self?.DNSName?.replace(/\.$/, "")
@@ -36,12 +42,12 @@ export async function startFunnel(port: number): Promise<Funnel> {
     throw new Error("tailscale is not installed. Install it from https://tailscale.com/download, sign in, then retry.")
   }
   const host = await tailscaleHost()
-  const r = await run(["tailscale", "funnel", "--bg", "--https=443", "--yes", `localhost:${port}`])
+  const r = await run(tailscale("funnel", "--bg", "--https=443", "--yes", `localhost:${port}`))
   if (r.code !== 0) throw new Error(`tailscale funnel failed: ${r.stderr.trim() || r.stdout.trim()}`)
   return {
     host,
     async stop() {
-      await run(["tailscale", "funnel", "--https=443", "off"])
+      await run(tailscale("funnel", "--https=443", "off"))
     },
   }
 }

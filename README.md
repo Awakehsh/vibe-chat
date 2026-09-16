@@ -74,6 +74,25 @@ as `vibechat`. On macOS the first run may need
 `vibechat serve` stores everything in `<data-dir>/vibe.db` and `<data-dir>/files/`.
 Moving a server to another machine is copying that directory.
 
+### Free: your own Mac, reachable from anywhere
+
+`vibechat serve --tunnel` publishes the server at a stable
+`https://<machine>.<tailnet>.ts.net` through Tailscale Funnel. It works with
+the Homebrew Tailscale daemon running as your user (no root, no VPN
+profile):
+
+```bash
+brew install tailscale
+D="$HOME/Library/Application Support/tailscaled"; mkdir -p "$D"
+tailscaled --tun=userspace-networking --statedir="$D" --socket="$D/tailscaled.sock" &
+tailscale --socket="$D/tailscaled.sock" up        # open the printed link and sign in
+TAILSCALE_SOCKET="$D/tailscaled.sock" vibechat serve --tunnel
+```
+
+The first `--tunnel` prints a link to enable Funnel on your tailnet (one
+click). To keep both running across reboots, install them as LaunchAgents;
+`docs/mac-launchagents.md` has the two plist files.
+
 See [docs/architecture.md](docs/architecture.md) for how the pieces fit and
 [docs/decisions.md](docs/decisions.md) for why they are shaped this way.
 
