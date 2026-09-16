@@ -57,9 +57,16 @@ runtime is needed at run time; the npm package is a launcher around the
 same binary.
 
 ```bash
-npm install -g vibe-chat                  # npm, or run once with: npx vibe-chat
 curl -fsSL https://raw.githubusercontent.com/Awakehsh/vibe-chat/main/install.sh | sh   # macOS / Linux
-brew install awakehsh/tap/vibechat        # Homebrew
+brew install awakehsh/tap/vibechat        # Homebrew (macOS / Linux)
+npm install -g vibe-chat                  # any OS with npm, or run once with: npx vibe-chat
+```
+
+Windows, in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/Awakehsh/vibe-chat/main/install.ps1 | iex   # downloads and adds to PATH
+scoop bucket add awakehsh https://github.com/Awakehsh/scoop-bucket; scoop install vibechat
 ```
 
 Or download `vibechat-<os>-<arch>` from the [releases](../../releases) page

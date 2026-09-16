@@ -58,6 +58,7 @@ jobs:
         run: |
           cd dist && sha256sum vibechat-* > checksums.txt && cd ..
           bun scripts/brew-formula.ts "${GITHUB_REF_NAME#v}" dist/checksums.txt > dist/vibechat.rb
+          bun scripts/scoop-manifest.ts "${GITHUB_REF_NAME#v}" dist/checksums.txt > dist/vibechat.json
           ls -la dist
       - uses: softprops/action-gh-release@v2
         with:
@@ -65,6 +66,7 @@ jobs:
             dist/vibechat-*
             dist/checksums.txt
             dist/vibechat.rb
+            dist/vibechat.json
           generate_release_notes: true
 
   npm:
