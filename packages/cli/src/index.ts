@@ -34,7 +34,7 @@ async function main(argv: string[]): Promise<void> {
   switch (command) {
     case undefined:
     case "chat":
-      return (await import("./tui/main.ts")).chat(sub)
+      return (await import("./tui/main.tsx")).chat(sub, VERSION)
     case "serve":
       return (await import("./commands/serve.ts")).serve(sub)
     case "new":

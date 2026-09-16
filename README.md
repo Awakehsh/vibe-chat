@@ -27,13 +27,14 @@ bun install
 bun run dev:server
 
 # terminal 2: create a group and get an invite code
-bun run dev:cli -- new "late night"
+bun run dev:cli -- new "late night" --host localhost:7788
 
 # terminal 3 (a friend): join with the invite code
 bun run dev:cli -- join localhost:7788/XXXXXXXXXX
 ```
 
-Then `bun run dev:cli` opens the chat.
+Then `bun run dev:cli` opens the chat. Inside it, `/help` lists commands;
+`/server`, `/new` and `/join` do the same as the subcommands.
 
 ## Commands
 

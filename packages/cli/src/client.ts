@@ -93,6 +93,13 @@ export class Client {
     await saveConfig(this.config, this.opts.configDir)
   }
 
+  /** Sets the server `/new` and host-less invites use; connects to it to validate. */
+  async setDefaultHost(host: string): Promise<void> {
+    await this.connect(host)
+    this.config = { ...rememberHost(this.config, host), defaultHost: host }
+    await saveConfig(this.config, this.opts.configDir)
+  }
+
   async createRoom(host: string, name: string, emoji?: string): Promise<Room> {
     const sync = await this.connect(host)
     void sync

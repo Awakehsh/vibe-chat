@@ -50,6 +50,7 @@ export class Connection {
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined
   private attempts = 0
   private stopped = false
+  private everSynced = false
   readonly cursors = new Map<string, number>()
   state: ConnectionState = "offline"
   session?: string
@@ -143,6 +144,7 @@ export class Connection {
       this.setState("syncing")
       const sync = (await this.request({ t: "sync", rooms: Object.fromEntries(this.cursors) })) as unknown as SyncResult
       for (const room of sync.rooms) this.cursors.set(room.roomId, room.lastSeq)
+      this.everSynced = true
       this.setState("online")
       this.emit("synced", sync)
       this.heartbeat = setInterval(() => this.sendRaw({ t: "ping" }), HEARTBEAT_INTERVAL_MS)
@@ -165,6 +167,12 @@ export class Connection {
     this.pending.clear()
     if (this.stopped || this.state === "closed") {
       if (this.state !== "closed") this.setState("closed", reason || `closed (${code})`)
+      return
+    }
+    // Never reached the first sync: fail fast so the caller can report it. Reconnects only after that.
+    if (!this.everSynced) {
+      this.stopped = true
+      this.setState("closed", reason || `could not connect to ${this.host}`)
       return
     }
     this.setState("offline", reason || `closed (${code})`)
