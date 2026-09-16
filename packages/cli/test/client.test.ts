@@ -80,6 +80,11 @@ describe("Client against a real server", () => {
 
     const dm = await a.openDm(room.roomId, b.identity.publicKey)
     expect(dm.kind).toBe("dm")
+    expect(a.model.titleOf(dm.roomId)).toBe("bob")
+    expect(a.model.room(dm.roomId)!.members.size).toBe(2)
+    // the other side learns the DM from a `room` event and hydrates members itself
+    await new Promise((r) => setTimeout(r, 200))
+    expect(fresh.model.titleOf(dm.roomId)).toBe("alice")
     a.close()
     fresh.close()
   })

@@ -1,4 +1,4 @@
-import { rollDice, type ClientRequestOf, type Message, type MessageKind, type Room, type SyncResult } from "@vibechat/protocol"
+import { rollDice, type ClientRequestOf, type Member, type Message, type MessageKind, type Room, type SyncResult, type User } from "@vibechat/protocol"
 import { forgetHost, loadConfig, rememberHost, saveConfig, type Config } from "./config.ts"
 import { Connection, RequestError, type ConnectionState } from "./connection.ts"
 import type { Identity } from "./identity.ts"
@@ -69,6 +69,8 @@ export class Client {
       if (ev.t === "msg") conn.advance(ev.message.roomId, ev.message.seq)
       if (ev.t === "room.removed") conn.forget(ev.roomId)
       this.model.apply(host, ev)
+      // A `room` event carries no members; a room we did not know yet needs them for its title and presence.
+      if (ev.t === "room" && this.model.room(ev.room.roomId)?.members.size === 0) void this.hydrateMembers(ev.room.roomId)
     })
     conn.on("state", (s, d) => {
       for (const fn of this.stateListeners) fn(host, s, d)
@@ -130,8 +132,21 @@ export class Client {
   }
 
   async openDm(roomId: string, userId: string): Promise<Room> {
+    const host = this.model.room(roomId)!.host
     const res = await this.conn(roomId).request({ t: "dm.open", userId })
-    return res.room as Room
+    const dm = res.room as Room
+    if (!this.model.room(dm.roomId)) this.model.addRoom(host, dm, [], [], [])
+    await this.hydrateMembers(dm.roomId)
+    return dm
+  }
+
+  private async hydrateMembers(roomId: string): Promise<void> {
+    try {
+      const res = await this.conn(roomId).request({ t: "room.members", roomId })
+      this.model.setMembers(roomId, res.members as Member[], res.users as User[])
+    } catch {
+      // the room may already be gone; the next sync repairs it
+    }
   }
 
   /** Sends a message with an optimistic local copy. Resolves to the confirmed message. */

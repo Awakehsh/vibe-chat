@@ -141,6 +141,15 @@ export class Model {
     this.emit({ type: "room-added", roomId: room.roomId })
   }
 
+  /** Fills in members for a room that was learned from a `room` event or `dm.open`. */
+  setMembers(roomId: string, members: Member[], users: User[]): void {
+    const r = this.rooms.get(roomId)
+    if (!r) return
+    for (const u of users) this.users.set(u.userId, u)
+    r.members = new Map(members.map((m) => [m.userId, m]))
+    this.emit({ type: "change" })
+  }
+
   prependHistory(roomId: string, messages: Message[], hasMore: boolean): void {
     const r = this.rooms.get(roomId)
     if (!r) return
