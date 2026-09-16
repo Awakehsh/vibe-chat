@@ -1,0 +1,27 @@
+{
+  "name": "vibe-chat",
+  "version": "0.1.0",
+  "description": "Terminal chat that looks like an AI coding agent session",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Awakehsh/vibe-chat"
+  },
+  "homepage": "https://github.com/Awakehsh/vibe-chat",
+  "bin": {
+    "vibechat": "bin/vibechat.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "vibe-chat-darwin-arm64": "0.1.0",
+    "vibe-chat-darwin-x64": "0.1.0",
+    "vibe-chat-linux-x64": "0.1.0",
+    "vibe-chat-linux-arm64": "0.1.0",
+    "vibe-chat-windows-x64": "0.1.0"
+  }
+}

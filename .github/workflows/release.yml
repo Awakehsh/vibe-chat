@@ -46,12 +46,54 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
-      - run: ls -la dist
+      - name: Checksums and Homebrew formula
+        run: |
+          cd dist && sha256sum vibechat-* > checksums.txt && cd ..
+          bun scripts/brew-formula.ts "${GITHUB_REF_NAME#v}" dist/checksums.txt > dist/vibechat.rb
+          ls -la dist
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: |
+            dist/vibechat-*
+            dist/checksums.txt
+            dist/vibechat.rb
           generate_release_notes: true
+
+  npm:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/bin
+          merge-multiple: true
+      - name: Build platform packages
+        run: bun scripts/npm-platform-packages.ts "${GITHUB_REF_NAME#v}" dist/bin dist/npm
+      - name: Publish
+        if: env.NODE_AUTH_TOKEN != ''
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for d in dist/npm/*/; do (cd "$d" && npm publish --access public); done
+          (cd packages/npm/vibe-chat && npm publish --access public)
+      - name: Skipped
+        if: env.NODE_AUTH_TOKEN == ''
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: echo "NPM_TOKEN secret not set; npm publish skipped"

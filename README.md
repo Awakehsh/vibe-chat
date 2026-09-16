@@ -52,11 +52,19 @@ to block characters elsewhere.
 
 ## Install
 
-Release binaries are attached to each [GitHub release](../../releases):
-`vibechat-darwin-arm64`, `vibechat-darwin-x64`, `vibechat-linux-x64`,
-`vibechat-linux-arm64`, `vibechat-windows-x64.exe`. Put one on your `PATH`
-as `vibechat`. On macOS the first run may need
-`xattr -d com.apple.quarantine vibechat`.
+Any one of these puts a `vibechat` command on your PATH. No Bun or Node
+runtime is needed at run time; the npm package is a launcher around the
+same binary.
+
+```bash
+npm install -g vibe-chat                  # npm, or run once with: npx vibe-chat
+curl -fsSL https://raw.githubusercontent.com/Awakehsh/vibe-chat/main/install.sh | sh   # macOS / Linux
+brew install awakehsh/tap/vibechat        # Homebrew
+```
+
+Or download `vibechat-<os>-<arch>` from the [releases](../../releases) page
+and put it on your PATH. On macOS a downloaded binary may need
+`xattr -d com.apple.quarantine vibechat` once.
 
 ## Commands
 
