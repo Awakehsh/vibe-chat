@@ -13,6 +13,10 @@ export const theme = {
   borderActive: "#d97757",
   spinner: "#d97757",
   reaction: "#87afaf",
+  cat: "#d97757",
+  catEye: "#1c1c1c",
+  menuBg: "#2e2e2e",
+  menuSelected: "#ffffff",
 } as const
 
 export const glyph = {

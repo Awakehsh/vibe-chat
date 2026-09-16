@@ -9,11 +9,12 @@ import { createIdentity, type Identity } from "../identity.ts"
 import { createNotifier } from "../notify.ts"
 import { COMMANDS, parseCommand, parsePoll, parseStatus } from "./commands.ts"
 import { POLL_DIGITS, isMention } from "./format.ts"
+import { Header } from "./Header.tsx"
 import { Onboarding } from "./Onboarding.tsx"
-import { Prompt, type PromptHandle } from "./Prompt.tsx"
+import { Prompt, type PromptHandle, type PromptMode } from "./Prompt.tsx"
 import { RoomPicker } from "./RoomPicker.tsx"
 import { StatusLine } from "./StatusLine.tsx"
-import { glyph, theme } from "./theme.ts"
+import { theme } from "./theme.ts"
 import { Transcript } from "./Transcript.tsx"
 
 export interface AppProps {
@@ -34,6 +35,7 @@ export function App(props: AppProps) {
   const [info, setInfo] = useState<string[]>([])
   const [notice, setNotice] = useState<string | undefined>()
   const [links, setLinks] = useState<Record<string, string>>({})
+  const [promptMode, setPromptMode] = useState<PromptMode>("text")
   const exitArmed = useRef(0)
   const focused = useRef(true)
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
@@ -294,20 +296,24 @@ export function App(props: AppProps) {
   const online = room && model ? [...room.members.keys()].filter((id) => model.user(id)?.online).length : 0
   const unreadElsewhere = model ? [...model.rooms.values()].filter((r) => r.room.roomId !== activeRoomId).reduce((n, r) => n + r.unread, 0) : 0
   const offline = Object.entries(links).filter(([, s]) => s !== "online" && s !== "syncing").map(([h]) => h)
-  const left = room
-    ? `#${title} · ${online} online${unreadElsewhere ? ` · ${unreadElsewhere} unread elsewhere` : ""}${offline.length ? ` · reconnecting ${offline.join(", ")}` : ""}`
-    : client
-      ? "no room · /new <name> or /join <host/TOKEN>"
-      : "connecting…"
+  const roomCount = model ? model.rooms.size : 0
+  const where = room ? `#${title} · ${online} online` : client ? "no rooms yet" : "connecting…"
+  const detail = room
+    ? [room.host, `${roomCount} room${roomCount === 1 ? "" : "s"}`, unreadElsewhere ? `${unreadElsewhere} unread elsewhere` : "", offline.length ? `reconnecting ${offline.join(", ")}` : ""].filter(Boolean).join(" · ")
+    : "/server <host[:port]> · /new <name> · /join <host/TOKEN>"
+  const hint = picker
+    ? "↑↓ move · Enter pick · Esc close"
+    : info.length
+      ? "Esc close"
+      : promptMode === "menu"
+        ? "↑↓ select · Tab complete · Enter run · Esc clear"
+        : promptMode === "history"
+          ? "↑↓ history · Enter send"
+          : "Enter send · ⇧Enter newline · Ctrl+K rooms · PageUp older"
 
   return (
     <box flexDirection="column" width="100%" height="100%">
-      <box flexDirection="row" justifyContent="space-between" paddingLeft={1} paddingRight={2} height={1} flexShrink={0}>
-        <text fg={theme.accent}>
-          {glyph.spinner} <span fg={theme.dim}>vibechat {props.version}</span>
-        </text>
-        <text fg={theme.dim}>{identity.name}</text>
-      </box>
+      <Header version={props.version} name={identity.name} where={where} detail={detail} />
       {picker && model ? (
         <RoomPicker
           model={model}
@@ -331,8 +337,15 @@ export function App(props: AppProps) {
           ))}
         </box>
       ) : null}
-      <Prompt ref={promptRef} active={!picker} placeholder={room ? "type a message · / for commands" : "/new <name> or /join <host/TOKEN>"} onSubmit={(t) => void run(t)} onTyping={() => activeRoomId && client?.typing(activeRoomId)} />
-      <StatusLine left={left} right="? /help" notice={notice} />
+      <Prompt
+        ref={promptRef}
+        active={!picker}
+        placeholder={room ? "type a message · / for commands" : "/server <host> to pick a server, then /new or /join"}
+        onSubmit={(t) => void run(t)}
+        onTyping={() => activeRoomId && client?.typing(activeRoomId)}
+        onMode={setPromptMode}
+      />
+      <StatusLine left={hint} right="/help" notice={notice} />
     </box>
   )
 }
