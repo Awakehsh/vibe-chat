@@ -34,9 +34,9 @@ export function Header({ version, name, where, detail }: HeaderProps) {
     }
   }, [])
   return (
-    <box flexDirection="row" height={3} flexShrink={0} paddingLeft={1} marginBottom={1}>
+    <box flexDirection="row" height={4} flexShrink={0} paddingLeft={1} marginBottom={1}>
       <Cat blink={blink} />
-      <box flexDirection="column" paddingLeft={2}>
+      <box flexDirection="column" paddingLeft={2} paddingTop={1}>
         <text>
           <span fg={theme.name}>
             <b>vibechat</b>

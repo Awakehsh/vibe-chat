@@ -1,22 +1,37 @@
 import { theme } from "./theme.ts"
 
 /**
- * The mascot: a 8×3 pixel cat built from block characters. The face row
- * paints the body colour over an eye-coloured background, so the notches in
- * ▛ and ▜ read as pupils. `blink` closes the eyes for a frame.
+ * The mascot: a fluffy kitten in a pink knit hat with antler tips, head
+ * tilted to the right. Four rows of block characters. The face row paints
+ * fur over an eye-coloured background so the notches in ▙ and ▟ read as two
+ * big pupils close together; `blink` closes them for a frame. Each row is
+ * shifted one column further right than the one below it, which is the tilt.
  */
 export function Cat({ blink = false }: { blink?: boolean }) {
   return (
-    <box flexDirection="column" width={9} flexShrink={0}>
-      <text fg={theme.cat}> ▟▙   ▟▙</text>
+    <box flexDirection="column" width={11} flexShrink={0}>
       <text>
-        <span fg={theme.cat}> ▐</span>
-        <span fg={theme.cat} bg={theme.catEye}>
-          {blink ? "█████" : "▛███▜"}
-        </span>
-        <span fg={theme.cat}>▌</span>
+        {"    "}
+        <span fg={theme.catAntler}>▘▝ ▘▝</span>
       </text>
-      <text fg={theme.cat}> ▝▀▀▀▀▀▘</text>
+      <text>
+        {"   "}
+        <span fg={theme.catHat}>▟█████▙</span>
+      </text>
+      <text>
+        {"  "}
+        <span fg={theme.catFur}>▐</span>
+        <span fg={theme.catFur} bg={theme.catEye}>
+          {blink ? "█████" : "█▙█▟█"}
+        </span>
+        <span fg={theme.catFur}>▌</span>
+      </text>
+      <text>
+        {" "}
+        <span fg={theme.catFur}>▝</span>
+        <span fg={theme.catWhite}>▀▀▀▀▀</span>
+        <span fg={theme.catFur}>▘</span>
+      </text>
     </box>
   )
 }

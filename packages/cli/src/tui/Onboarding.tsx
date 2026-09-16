@@ -11,9 +11,9 @@ export function Onboarding({ onDone }: { onDone: (name: string) => void }) {
   }
   return (
     <box flexDirection="column" flexGrow={1} paddingLeft={1} paddingTop={1}>
-      <box flexDirection="row" height={3} marginBottom={1}>
+      <box flexDirection="row" height={4} marginBottom={1}>
         <Cat />
-        <box flexDirection="column" paddingLeft={2}>
+        <box flexDirection="column" paddingLeft={2} paddingTop={1}>
           <text fg={theme.name}>
             <b>Welcome to vibechat</b>
           </text>
