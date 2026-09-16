@@ -36,6 +36,7 @@ export function App(props: AppProps) {
   const [notice, setNotice] = useState<string | undefined>()
   const [links, setLinks] = useState<Record<string, string>>({})
   const [promptMode, setPromptMode] = useState<PromptMode>("text")
+  const [happyTick, setHappyTick] = useState(0)
   const exitArmed = useRef(0)
   const focused = useRef(true)
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
@@ -70,6 +71,8 @@ export function App(props: AppProps) {
       if (cancelled) return
       c.model.on((e) => {
         setTick((t) => t + 1)
+        if (e.type === "message" && !e.own && isMention(e.message, identity.name)) setHappyTick((t) => t + 1)
+        if (e.type === "reaction-to-me") setHappyTick((t) => t + 1)
         if (e.type === "message" && !e.own && props.notifications) {
           const mention = isMention(e.message, identity.name)
           if (!focused.current || e.roomId !== activeRef.current || mention) {
@@ -313,7 +316,7 @@ export function App(props: AppProps) {
 
   return (
     <box flexDirection="column" width="100%" height="100%">
-      <Header version={props.version} name={identity.name} where={where} detail={detail} />
+      <Header version={props.version} name={identity.name} where={where} detail={detail} happyTick={happyTick} />
       {picker && model ? (
         <RoomPicker
           model={model}

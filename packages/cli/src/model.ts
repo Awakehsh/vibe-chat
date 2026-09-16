@@ -15,6 +15,7 @@ export type ModelEvent =
   | { type: "message"; roomId: string; message: Message; own: boolean }
   | { type: "room-added"; roomId: string }
   | { type: "room-removed"; roomId: string; reason: string }
+  | { type: "reaction-to-me"; roomId: string; msgId: string; userId: string; emoji: string }
   | { type: "change" }
 
 /** In-memory view of every server the client is on. Pure state; no I/O. */
@@ -202,6 +203,10 @@ export class Model {
         const next = ev.on ? (list.includes(ev.userId) ? list : [...list, ev.userId]) : list.filter((u) => u !== ev.userId)
         if (next.length === 0) delete m.reactions[ev.emoji]
         else m.reactions[ev.emoji] = next
+        if (ev.on && m.authorId === this.selfId && ev.userId !== this.selfId) {
+          this.emit({ type: "reaction-to-me", roomId: ev.roomId, msgId: ev.msgId, userId: ev.userId, emoji: ev.emoji })
+          return
+        }
         this.emit({ type: "change" })
         return
       }
