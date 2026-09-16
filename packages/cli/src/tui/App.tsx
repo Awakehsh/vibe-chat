@@ -86,6 +86,9 @@ export function App(props: AppProps) {
   composeRef.current = compose
   /** Rows printed into scrollback so far; the footer shrinks by this much until it reaches its live height. */
   const printed = useRef(0)
+  /** Rows of shell output above us; cleared after a resize repaint, which starts from an empty screen. */
+  const preRowsRef = useRef(props.preRows)
+  const clientRef = useRef<Client | undefined>(undefined)
   const printedSeq = useRef(new Map<string, number>())
   const lastPrinted = useRef(new Map<string, Message>())
   /** Scrollback writes happen in order, including the asynchronous ones (markdown, images). */
@@ -100,10 +103,10 @@ export function App(props: AppProps) {
   const applyFooter = useCallback(
     (extraPrinted = 0) => {
       const total = renderer.terminalHeight
-      const wanted = Math.min(total, Math.max(liveRowsRef.current, total - (props.preRows + printed.current + extraPrinted)))
+      const wanted = Math.min(total, Math.max(liveRowsRef.current, total - (preRowsRef.current + printed.current + extraPrinted)))
       if (renderer.footerHeight !== wanted) renderer.footerHeight = wanted
     },
-    [renderer, props.preRows],
+    [renderer],
   )
 
   const width = useCallback(() => Math.max(20, renderer.terminalWidth), [renderer])
@@ -183,10 +186,38 @@ export function App(props: AppProps) {
     [print, printMessage, width],
   )
 
+  // A resize reflows what the terminal already holds and the footer can no longer
+  // be trusted to sit where it was. Erase the screen, start the footer from the
+  // top again, and reprint the tail of the room so the view stays readable.
+  const resizeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const repaintAfterResize = useCallback(() => {
+    try {
+      renderer.resetSplitFooterForReplay()
+    } catch {
+      return
+    }
+    queue.current = Promise.resolve()
+    printed.current = 0
+    preRowsRef.current = 0
+    const c = clientRef.current
+    const roomId = activeRef.current
+    if (c && roomId && c.model.room(roomId)) {
+      const r = c.model.room(roomId)!
+      printedSeq.current.set(roomId, Math.max(0, r.room.lastSeq - REPLAY_COUNT))
+      replayRoom(c, roomId)
+    } else {
+      applyFooter()
+    }
+  }, [renderer, replayRoom, applyFooter])
+
   useEffect(() => {
     const onFocus = () => (focused.current = true)
     const onBlur = () => (focused.current = false)
-    const onResize = () => setRows(renderer.terminalHeight)
+    const onResize = () => {
+      setRows(renderer.terminalHeight)
+      if (resizeTimer.current) clearTimeout(resizeTimer.current)
+      resizeTimer.current = setTimeout(repaintAfterResize, 150)
+    }
     renderer.on("focus", onFocus)
     renderer.on("blur", onBlur)
     renderer.on("resize", onResize)
@@ -194,8 +225,9 @@ export function App(props: AppProps) {
       renderer.off("focus", onFocus)
       renderer.off("blur", onBlur)
       renderer.off("resize", onResize)
+      if (resizeTimer.current) clearTimeout(resizeTimer.current)
     }
-  }, [renderer])
+  }, [renderer, repaintAfterResize])
 
   useEffect(() => {
     if (!identity || client) return
@@ -233,6 +265,7 @@ export function App(props: AppProps) {
       if (cancelled) return
       const hosts = c.config.hosts
       print(headerLines(props.version, c.identity.name, hosts.length ? hosts.join(" · ") : "/server <host[:port]> · /new <name> · /join <host/TOKEN>"))
+      clientRef.current = c
       setClient(c)
       for (const f of failures) flash(`${f.host}: ${f.error}`, 8000)
     })()
