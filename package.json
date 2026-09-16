@@ -1,0 +1,21 @@
+{
+  "name": "vibe-chat-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "bun run --filter '*' typecheck",
+    "test": "bun test",
+    "dev:server": "bun run --cwd packages/server dev",
+    "dev:cli": "bun run --cwd packages/cli dev",
+    "build": "bun run --cwd packages/cli build"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "bun": ">=1.4.1"
+  }
+}
