@@ -1,5 +1,6 @@
-import { rollDice, type ClientRequestOf, type Member, type Message, type MessageKind, type Room, type SyncResult, type User } from "@vibechat/protocol"
+import { rollDice, type Attachment, type ClientRequestOf, type Member, type Message, type MessageKind, type Room, type SyncResult, type User } from "@vibechat/protocol"
 import { forgetHost, loadConfig, rememberHost, saveConfig, type Config } from "./config.ts"
+import { saveIdentity } from "./identity.ts"
 import { Connection, RequestError, type ConnectionState } from "./connection.ts"
 import type { Identity } from "./identity.ts"
 import { Model } from "./model.ts"
@@ -131,6 +132,64 @@ export class Client {
     await this.conn(roomId).request({ t: "room.leave", roomId })
   }
 
+  async kick(roomId: string, userId: string): Promise<void> {
+    await this.conn(roomId).request({ t: "room.kick", roomId, userId })
+  }
+
+  async transfer(roomId: string, userId: string): Promise<void> {
+    await this.conn(roomId).request({ t: "room.transfer", roomId, userId })
+  }
+
+  async renameRoom(roomId: string, name: string, emoji?: string): Promise<void> {
+    const req: ClientRequestOf<"room.update"> = { t: "room.update", roomId, name }
+    if (emoji !== undefined) req.emoji = emoji
+    await this.conn(roomId).request(req)
+  }
+
+  async resetInvite(roomId: string): Promise<string> {
+    const res = await this.conn(roomId).request({ t: "room.invite.reset", roomId })
+    return (res.room as Room).invite ?? ""
+  }
+
+  async deleteRoom(roomId: string): Promise<void> {
+    const host = this.model.room(roomId)?.host
+    await this.conn(roomId).request({ t: "room.delete", roomId })
+    if (host) await this.pruneHost(host)
+  }
+
+  /** Changes name and/or emoji on every server and in the identity file. */
+  async setProfile(patch: { name?: string; emoji?: string }): Promise<void> {
+    const req: ClientRequestOf<"profile.set"> = { t: "profile.set" }
+    if (patch.name !== undefined) req.name = patch.name
+    if (patch.emoji !== undefined) req.emoji = patch.emoji
+    await Promise.all([...this.connections.values()].filter((c) => c.state === "online").map((c) => c.request(req)))
+    if (patch.name !== undefined) this.opts.identity.name = patch.name
+    if (patch.emoji !== undefined) {
+      if (patch.emoji) this.opts.identity.emoji = patch.emoji
+      else delete this.opts.identity.emoji
+    }
+    await saveIdentity(this.opts.identity, this.opts.configDir)
+  }
+
+  /** Uploads a local file to a room and returns the attachment id for msg.send. */
+  async upload(roomId: string, path: string): Promise<Attachment> {
+    const file = Bun.file(path)
+    if (!(await file.exists())) throw new RequestError("not_found", `no such file: ${path}`)
+    const limit = this.conn(roomId).hello?.limits.fileBytes ?? 2 * 1024 * 1024
+    if (file.size > limit) throw new RequestError("too_large", `file is ${Math.round(file.size / 1024)} KB; the limit is ${Math.round(limit / 1024)} KB`)
+    const name = path.split(/[\\/]/).pop() ?? "file"
+    const res = await this.conn(roomId).request({ t: "file.upload", roomId, name, mime: file.type || "application/octet-stream", dataB64: Buffer.from(await file.arrayBuffer()).toString("base64") })
+    return res.attachment as Attachment
+  }
+
+  /** HTTP base URL and bearer token for downloading a room's files. */
+  fileUrl(roomId: string, fileId: string): { url: string; session: string } | undefined {
+    const r = this.model.room(roomId)
+    const c = r && this.connections.get(r.host)
+    if (!c?.session) return undefined
+    return { url: c.url.replace(/^ws/, "http").replace(/\/ws$/, `/files/${fileId}`), session: c.session }
+  }
+
   async openDm(roomId: string, userId: string): Promise<Room> {
     const host = this.model.room(roomId)!.host
     const res = await this.conn(roomId).request({ t: "dm.open", userId })
@@ -197,14 +256,17 @@ export class Client {
     await this.conn(roomId).request({ t: "msg.react", msgId, emoji, on })
   }
 
-  async loadOlder(roomId: string, limit = 50): Promise<void> {
+  /** Loads older messages into the model and returns them (ascending). */
+  async loadOlder(roomId: string, limit = 50): Promise<Message[]> {
     const r = this.model.room(roomId)
-    if (!r || !r.hasOlder) return
+    if (!r || !r.hasOlder) return []
     const oldest = r.messages.find((m) => m.seq > 0)?.seq
     const req: ClientRequestOf<"msg.history"> = { t: "msg.history", roomId, limit }
     if (oldest !== undefined) req.beforeSeq = oldest
     const res = await this.conn(roomId).request(req)
-    this.model.prependHistory(roomId, res.messages as Message[], res.hasMore as boolean)
+    const older = res.messages as Message[]
+    this.model.prependHistory(roomId, older, res.hasMore as boolean)
+    return older
   }
 
   async setStatus(statusText: string, statusEmoji?: string): Promise<void> {

@@ -11,9 +11,13 @@ export interface Config {
   kittyKeyboard?: boolean
   /** Desktop notifications for messages in rooms you are not looking at. */
   notifications: boolean
+  /** A short sound when you are mentioned. */
+  sounds: boolean
+  /** Set your status automatically while an AI coding CLI is running on this machine. */
+  autoStatus: boolean
 }
 
-const DEFAULT_CONFIG: Config = { hosts: [], notifications: true }
+const DEFAULT_CONFIG: Config = { hosts: [], notifications: true, sounds: true, autoStatus: false }
 
 export function configDir(env: NodeJS.ProcessEnv = process.env): string {
   if (env.VIBECHAT_HOME) return env.VIBECHAT_HOME

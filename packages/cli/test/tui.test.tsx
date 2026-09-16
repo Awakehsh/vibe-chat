@@ -3,7 +3,8 @@ import type { Message } from "@vibechat/protocol"
 import { Model } from "../src/model.ts"
 import { completions, parseCommand, parsePoll, parseStatus } from "../src/tui/commands.ts"
 import { pollLines, rollLine } from "../src/tui/format.ts"
-import { commandLines, dividerLines, editedLines, headerLines, messageLines, reactionLines, textOf, wrap } from "../src/tui/scrollback.ts"
+import { bodyChunks, commandLines, dividerLines, editedLines, hasBlockMarkdown, headerLines, messageLines, reactionLines, textOf, wrap } from "../src/tui/scrollback.ts"
+import { autoStatusText } from "../src/autostatus.ts"
 
 const me = "M".repeat(43)
 const bob = "B".repeat(43)
@@ -82,6 +83,27 @@ describe("message lines", () => {
     expect(head).toHaveLength(5)
     expect(head[1]).toContain("vibechat v0.1.0")
     expect(head[2]).toContain("小鹿")
+  })
+})
+
+describe("inline markdown", () => {
+  test("bold, italic, code and links keep their text and drop the markers", () => {
+    const chunks = bodyChunks("say **hi** to *you* with `code` and [docs](https://x.y)", "#fff", "me")
+    expect(textOf(chunks)).toBe("say hi to you with  code  and docs (https://x.y)")
+    expect(chunks.find((c) => c.text === "hi")?.attributes).toBeTruthy()
+  })
+  test("mentions inside bold still highlight", () => {
+    expect(textOf(bodyChunks("**@me look**", "#fff", "me"))).toBe("@me look")
+  })
+  test("block markdown detection", () => {
+    expect(hasBlockMarkdown("plain **bold**")).toBe(false)
+    expect(hasBlockMarkdown("look:\n```ts\nlet a = 1\n```")).toBe(true)
+    expect(hasBlockMarkdown("- a\n- b")).toBe(true)
+    expect(hasBlockMarkdown("# title")).toBe(true)
+  })
+  test("auto status text", () => {
+    expect(autoStatusText([])).toBe("")
+    expect(autoStatusText(["Claude Code", "Codex"])).toBe("busy with Claude Code + Codex")
   })
 })
 

@@ -14,6 +14,8 @@ export const theme = {
   spinner: "#d97757",
   reaction: "#87afaf",
   menuBg: "#2e2e2e",
+  code: "#e0e0e0",
+  codeBg: "#3a3a3a",
   menuSelected: "#ffffff",
 } as const
 

@@ -2,6 +2,8 @@
   "name": "@vibechat/cli",
   "version": "0.1.0",
   "private": true,
+  "description": "Terminal chat that looks like an AI coding agent session",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "vibechat": "./src/index.ts"

@@ -33,8 +33,30 @@ bun run dev:cli -- new "late night" --host localhost:7788
 bun run dev:cli -- join localhost:7788/XXXXXXXXXX
 ```
 
-Then `bun run dev:cli` opens the chat. Inside it, `/help` lists commands;
-`/server`, `/new` and `/join` do the same as the subcommands.
+Then `bun run dev:cli` opens the chat. Inside it, `/help` lists everything.
+The ones you will use most:
+
+| In the chat | |
+|---|---|
+| `/server host:port` · `/new name` · `/join host/TOKEN` | pick a server, create or join a group |
+| `Ctrl+K` · `/room name` · `/dm name` | switch rooms, open a direct message |
+| `/reply` · `/edit` · `/delete` · `/react [emoji]` | pick a recent message and act on it |
+| `/upload path` · `/sticker text` · `/roll 2d6` · `/poll q \| a \| b` · `/vote n` · `/me action` | images, big letters, dice, polls |
+| `/name` · `/emoji` · `/status text 🎧` · `/status auto` | who you are; `auto` follows your AI coding CLI |
+| `/invite [reset]` · `/members` · `/history` · `/kick` · `/transfer` · `/rename` · `/destroy yes` | room management (owner) |
+
+Messages support inline markdown (`**bold**`, `*italic*`, `` `code` ``, links)
+and fenced code blocks with syntax highlighting. Images display inline in
+terminals that support the kitty or sixel graphics protocols and fall back
+to block characters elsewhere.
+
+## Install
+
+Release binaries are attached to each [GitHub release](../../releases):
+`vibechat-darwin-arm64`, `vibechat-darwin-x64`, `vibechat-linux-x64`,
+`vibechat-linux-arm64`, `vibechat-windows-x64.exe`. Put one on your `PATH`
+as `vibechat`. On macOS the first run may need
+`xattr -d com.apple.quarantine vibechat`.
 
 ## Commands
 

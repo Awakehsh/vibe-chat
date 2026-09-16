@@ -4,7 +4,24 @@
  * line is never redrawn, the same way an agent CLI's transcript works.
  * Later changes (reactions, edits, deletions) are printed as new lines.
  */
-import { BoxRenderable, StyledText, TextRenderable, bg, bold, fg, stringToStyledText, type CliRenderer, type TextChunk } from "@opentui/core"
+import {
+  ASCIIFontRenderable,
+  BoxRenderable,
+  ImageRenderable,
+  MarkdownRenderable,
+  RGBA,
+  StyledText,
+  SyntaxStyle,
+  TextRenderable,
+  bg,
+  bold,
+  fg,
+  italic,
+  stringToStyledText,
+  underline,
+  type CliRenderer,
+  type TextChunk,
+} from "@opentui/core"
 import type { Message, PollMeta, RollMeta } from "@vibechat/protocol"
 import type { Model } from "../model.ts"
 import { CAT_FRAMES } from "./Cat.tsx"
@@ -62,16 +79,40 @@ export function wrap(text: string, max: number): string[] {
 }
 
 const MENTION = /(@[\p{L}\p{N}_]+)/u
+const INLINE = /(\*\*[^*\n]+\*\*|`[^`\n]+`|\*[^*\n]+\*|_[^_\n]+_|\[[^\]\n]+\]\([^)\s]+\))/u
 
-/** Body text with @mentions highlighted; `color` is the base colour. */
-function bodyChunks(text: string, color: string, selfName: string): TextChunk[] {
+function mentionChunks(text: string, color: string, selfName: string, wrapStyle?: (c: TextChunk) => TextChunk): TextChunk[] {
   return text.split(MENTION).filter(Boolean).map((part) => {
     if (part.startsWith("@")) {
       const me = part.slice(1).toLowerCase() === selfName.toLowerCase()
       return me ? colb(theme.accent, part) : colb(theme.name, part)
     }
-    return col(color, part)
+    const c = col(color, part)
+    return wrapStyle ? wrapStyle(c) : c
   })
+}
+
+/** Body text with inline markdown (bold, italic, code, links) and @mentions highlighted. */
+export function bodyChunks(text: string, color: string, selfName: string): TextChunk[] {
+  const out: TextChunk[] = []
+  for (const part of text.split(INLINE).filter(Boolean)) {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) out.push(...mentionChunks(part.slice(2, -2), color, selfName, (c) => bold(c)))
+    else if (part.startsWith("`") && part.endsWith("`") && part.length > 2) out.push(bg(theme.codeBg)(col(theme.code, ` ${part.slice(1, -1)} `)))
+    else if ((part.startsWith("*") && part.endsWith("*")) || (part.startsWith("_") && part.endsWith("_"))) out.push(...mentionChunks(part.slice(1, -1), color, selfName, (c) => italic(c)))
+    else if (part.startsWith("[")) {
+      const m = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(part)
+      if (m) {
+        out.push(underline(col(theme.other, m[1]!)))
+        out.push(col(theme.dim, ` (${m[2]})`))
+      } else out.push(...mentionChunks(part, color, selfName))
+    } else out.push(...mentionChunks(part, color, selfName))
+  }
+  return out
+}
+
+/** Fenced code, lists, headings or quotes: rendered as a markdown block instead of inline text. */
+export function hasBlockMarkdown(text: string): boolean {
+  return /(^|\n)\s*(```|#{1,6}\s|[-*+]\s|\d+\.\s|>\s)/.test(text)
 }
 
 /** Wrap a body under a prefix; continuation lines are indented. */
@@ -232,4 +273,55 @@ export function commit(renderer: CliRenderer, lines: Line[]): number {
     return { root, width: ctx.width, height: lines.length, trailingNewline: true }
   })
   return lines.length
+}
+
+const SYNTAX = SyntaxStyle.fromStyles({
+  keyword: { fg: RGBA.fromHex("#d97757"), bold: true },
+  string: { fg: RGBA.fromHex("#9ccc65") },
+  comment: { fg: RGBA.fromHex("#6c6c6c"), italic: true },
+  number: { fg: RGBA.fromHex("#d7af5f") },
+  function: { fg: RGBA.fromHex("#5fafff") },
+  default: { fg: RGBA.fromHex("#e0e0e0") },
+})
+
+/** Renders a renderable through a scrollback surface, commits every row it produced, and returns the row count. */
+async function commitSurface(renderer: CliRenderer, build: (ctx: import("@opentui/core").RenderContext, width: number) => import("@opentui/core").Renderable): Promise<number> {
+  const surface = renderer.createScrollbackSurface({ startOnNewLine: true })
+  try {
+    surface.root.add(build(surface.renderContext, surface.width))
+    surface.render()
+    await surface.settle(1500)
+    const rows = surface.height
+    if (rows > 0) surface.commitRows(0, rows, { trailingNewline: true })
+    return rows
+  } finally {
+    surface.destroy()
+  }
+}
+
+/** A message body with block markdown: fenced code, lists, headings. Indented under its author line. */
+export function commitMarkdown(renderer: CliRenderer, body: string): Promise<number> {
+  return commitSurface(renderer, (ctx, width) => {
+    const box = new BoxRenderable(ctx, { id: `sb-${seq++}`, width, paddingLeft: 2, flexDirection: "column", backgroundColor: "transparent" })
+    box.add(new MarkdownRenderable(ctx, { id: `sb-${seq++}`, content: body, syntaxStyle: SYNTAX, width: Math.max(10, width - 2) }))
+    return box
+  })
+}
+
+/** Big letters for /sticker. */
+export function commitSticker(renderer: CliRenderer, text: string): Promise<number> {
+  return commitSurface(renderer, (ctx, width) => {
+    const box = new BoxRenderable(ctx, { id: `sb-${seq++}`, width, paddingLeft: 2, backgroundColor: "transparent" })
+    box.add(new ASCIIFontRenderable(ctx, { id: `sb-${seq++}`, text: text.slice(0, 16), font: "block", color: theme.accent }))
+    return box
+  })
+}
+
+/** An image, drawn with whatever protocol the terminal supports (kitty, sixel, or blocks). */
+export function commitImage(renderer: CliRenderer, bytes: Uint8Array, cols: number, rows: number): Promise<number> {
+  return commitSurface(renderer, (ctx, width) => {
+    const box = new BoxRenderable(ctx, { id: `sb-${seq++}`, width, paddingLeft: 2, backgroundColor: "transparent" })
+    box.add(new ImageRenderable(ctx, { id: `sb-${seq++}`, source: bytes, fit: "fit", protocol: "auto", width: Math.min(cols, width - 2), height: rows }))
+    return box
+  })
 }

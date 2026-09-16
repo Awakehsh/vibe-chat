@@ -89,3 +89,19 @@ A message from someone else starts `⏺ name: `; the next messages from the
 same person within three minutes are indented without the name, like
 continued paragraphs of one answer. Your own messages always start with `>`.
 Mentions of you are highlighted in the accent colour. No timestamps.
+
+## D13 — Acting on a message goes through a picker, not a cursor (2026-09)
+
+Printed lines cannot be highlighted, so `/reply`, `/edit`, `/delete` and
+`/react` open a list of the last twelve messages in the live region; picking
+one puts the prompt into that mode (the status line says what you are
+replying to or editing; Esc cancels). Your identity is changed the same
+way: `/name`, `/emoji`, `/status`. There is no settings screen.
+
+## D14 — Rich content is rendered once into scrollback (2026-09)
+
+Fenced code, lists and headings render through the markdown component,
+`/sticker` through the block font, and image attachments through the image
+component (kitty or sixel where supported, block characters elsewhere), each
+committed to scrollback as a block whose height is measured after layout.
+Inline markdown in ordinary lines is styled by the line builder.
