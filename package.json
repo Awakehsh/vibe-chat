@@ -5,7 +5,7 @@
     "packages/*"
   ],
   "scripts": {
-    "typecheck": "bun run --filter '*' typecheck",
+    "typecheck": "tsc -p tsconfig.json",
     "test": "bun test",
     "dev:server": "bun run --cwd packages/server dev",
     "dev:cli": "bun run --cwd packages/cli dev",
