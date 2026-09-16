@@ -1,0 +1,24 @@
+{
+  "name": "@vibechat/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "vibechat": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "dev": "bun run src/index.ts",
+    "build": "bun build --compile --minify src/index.ts --outfile dist/vibechat"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.5.11",
+    "@opentui/react": "^0.5.11",
+    "@vibechat/protocol": "workspace:*",
+    "@vibechat/server": "workspace:*",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0"
+  }
+}

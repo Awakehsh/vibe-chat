@@ -74,6 +74,10 @@ export const clientFrameSchema = z.discriminatedUnion("t", [
 export type ClientFrame = z.infer<typeof clientFrameSchema>
 export type ClientRequest = Exclude<ClientFrame, { t: "typing" | "read.mark" | "ping" }>
 export type ClientFrameOf<T extends ClientFrame["t"]> = Extract<ClientFrame, { t: T }>
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+/** A request frame without its `id` (the transport assigns one). */
+export type ClientRequestBody = DistributiveOmit<ClientRequest, "id">
+export type ClientRequestOf<T extends ClientRequest["t"]> = Omit<ClientFrameOf<T>, "id">
 
 /** Parse raw JSON text into a client frame, or return the failure. */
 export function parseClientFrame(text: string): { ok: true; frame: ClientFrame } | { ok: false; message: string } {
