@@ -213,8 +213,15 @@ export function App(props: AppProps) {
   useEffect(() => {
     const onFocus = () => (focused.current = true)
     const onBlur = () => (focused.current = false)
+    // The renderer also emits "resize" when the footer height changes; only a
+    // change of the terminal itself needs the repaint.
+    let last = { w: renderer.terminalWidth, h: renderer.terminalHeight }
     const onResize = () => {
-      setRows(renderer.terminalHeight)
+      const w = renderer.terminalWidth
+      const h = renderer.terminalHeight
+      if (w === last.w && h === last.h) return
+      last = { w, h }
+      setRows(h)
       if (resizeTimer.current) clearTimeout(resizeTimer.current)
       resizeTimer.current = setTimeout(repaintAfterResize, 150)
     }
