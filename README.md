@@ -52,14 +52,12 @@ to block characters elsewhere.
 
 ## Install
 
-Any one of these puts a `vibechat` command on your PATH. No Bun or Node
-runtime is needed at run time; the npm package is a launcher around the
-same binary.
+Any one of these puts a `vibechat` command on your PATH. It is a single
+binary; nothing else needs to be installed.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Awakehsh/vibe-chat/main/install.sh | sh   # macOS / Linux
 brew install awakehsh/tap/vibechat        # Homebrew (macOS / Linux)
-npm install -g vibe-chat                  # any OS with npm, or run once with: npx vibe-chat
+curl -fsSL https://raw.githubusercontent.com/Awakehsh/vibe-chat/main/install.sh | sh   # macOS / Linux
 ```
 
 Windows, in PowerShell:
