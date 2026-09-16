@@ -1,5 +1,5 @@
 import type { KeyEvent, TextareaRenderable } from "@opentui/core"
-import { forwardRef, useImperativeHandle, useRef, useState } from "react"
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
 import { COMMANDS, completions, type SlashCommand } from "./commands.ts"
 import { glyph, theme } from "./theme.ts"
 
@@ -25,8 +25,16 @@ export type PromptMode = "text" | "menu" | "history"
  */
 export const Prompt = forwardRef<
   PromptHandle,
-  { onSubmit: (text: string) => void; onTyping: () => void; onMode?: (mode: PromptMode) => void; placeholder: string; active: boolean }
->(function Prompt({ onSubmit, onTyping, onMode, placeholder, active }, ref) {
+  {
+    onSubmit: (text: string) => void
+    onTyping: () => void
+    onMode?: (mode: PromptMode) => void
+    /** Rows this component currently needs (menu + boxed input). */
+    onLayout?: (rows: number) => void
+    placeholder: string
+    active: boolean
+  }
+>(function Prompt({ onSubmit, onTyping, onMode, onLayout, placeholder, active }, ref) {
   const area = useRef<TextareaRenderable>(null)
   const [draft, setDraft] = useState("")
   const [selected, setSelected] = useState(0)
@@ -127,6 +135,11 @@ export const Prompt = forwardRef<
 
   const start = Math.max(0, Math.min(sel - Math.floor(MENU_ROWS / 2), menu.length - MENU_ROWS))
   const visible = menu.slice(start, start + MENU_ROWS)
+  const inputRows = Math.min(6, Math.max(1, draft.split("\n").length))
+  const rows = visible.length + inputRows + 2
+  useEffect(() => {
+    onLayout?.(rows)
+  }, [rows, onLayout])
 
   return (
     <box flexDirection="column" flexShrink={0}>

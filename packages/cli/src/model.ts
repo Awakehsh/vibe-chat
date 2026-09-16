@@ -16,6 +16,8 @@ export type ModelEvent =
   | { type: "room-added"; roomId: string }
   | { type: "room-removed"; roomId: string; reason: string }
   | { type: "reaction-to-me"; roomId: string; msgId: string; userId: string; emoji: string }
+  | { type: "reaction"; roomId: string; message: Message; userId: string; emoji: string; on: boolean }
+  | { type: "updated"; roomId: string; message: Message }
   | { type: "change" }
 
 /** In-memory view of every server the client is on. Pure state; no I/O. */
@@ -192,7 +194,7 @@ export class Model {
         if (!r) return
         const idx = r.messages.findIndex((m) => m.msgId === ev.message.msgId)
         if (idx >= 0) r.messages[idx] = ev.message
-        this.emit({ type: "change" })
+        this.emit({ type: "updated", roomId: r.room.roomId, message: ev.message })
         return
       }
       case "reaction": {
@@ -205,9 +207,8 @@ export class Model {
         else m.reactions[ev.emoji] = next
         if (ev.on && m.authorId === this.selfId && ev.userId !== this.selfId) {
           this.emit({ type: "reaction-to-me", roomId: ev.roomId, msgId: ev.msgId, userId: ev.userId, emoji: ev.emoji })
-          return
         }
-        this.emit({ type: "change" })
+        this.emit({ type: "reaction", roomId: ev.roomId, message: m, userId: ev.userId, emoji: ev.emoji, on: ev.on })
         return
       }
       case "typing": {

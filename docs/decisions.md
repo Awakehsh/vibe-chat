@@ -69,3 +69,23 @@ Chat convention over editor convention. Submit runs two event-loop ticks
 after the key so that an input method's pending composition is committed
 before the text is read. This costs ~1 ms and avoids losing the last CJK
 character on some terminals.
+
+## D11 — Transcript lives in the terminal's scrollback; only the prompt is live (2026-09)
+
+Supersedes the scroll-box transcript. Messages, the welcome header, room
+dividers and command output are printed into the terminal's own scrollback
+and never redrawn; the live region is a footer holding the typing line, the
+prompt and the status line. At startup the footer is sized so it sits right
+below whatever is on screen, and it shrinks as lines are printed until the
+screen is full, after which it stays at the bottom. This is how agent CLIs
+behave, it keeps the terminal's scrolling and text selection working, and
+the conversation stays on screen after you quit. Changes to printed
+messages (reactions, edits, deletions) are printed as new lines. The mouse
+is not captured so wheel scrolling reaches the terminal.
+
+## D12 — Names are shown once per run (2026-09)
+
+A message from someone else starts `⏺ name: `; the next messages from the
+same person within three minutes are indented without the name, like
+continued paragraphs of one answer. Your own messages always start with `>`.
+Mentions of you are highlighted in the accent colour. No timestamps.

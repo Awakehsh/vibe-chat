@@ -22,7 +22,9 @@ bun run dev:cli -- <args>      # the vibechat CLI from source
 - Server: `packages/server/src/server.ts` (transport), `handlers.ts` (frame
   dispatch), `store.ts` (SQLite queries), `db.ts` (schema + migrations).
 - CLI: `packages/cli/src/index.ts` (commands), `client.ts` (WebSocket
-  client with reconnect + sync), `tui/` (OpenTUI React UI).
+  client with reconnect + sync), `tui/` (OpenTUI React UI). The transcript
+  is printed into terminal scrollback by `tui/scrollback.ts`; only the
+  footer (prompt, status) is a live React tree. See docs/decisions.md D11.
 - Decisions and their reasons: `docs/decisions.md`. Add an entry when a
   decision changes; do not rewrite history.
 

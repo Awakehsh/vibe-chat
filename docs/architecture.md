@@ -29,8 +29,10 @@ uses Bun's built-in pub/sub: each connection subscribes to `room:<id>` after
 dispatches. `identity.ts` and `config.ts` manage `~/.config/vibechat/`.
 `client.ts` is a reconnecting WebSocket client that performs the handshake,
 runs `sync`, keeps an in-memory model (rooms, members, users, messages by
-room) and emits typed events to the UI. `tui/` is an OpenTUI React app that
-renders that model. `commands/` are the non-UI subcommands (`serve` embeds
+room) and emits typed events to the UI. `tui/` is an OpenTUI React app in split-footer
+mode: `scrollback.ts` prints messages and command output into the terminal's
+scrollback, and the React tree renders only the live footer (typing line,
+prompt with its command menu, status line). `commands/` are the non-UI subcommands (`serve` embeds
 the server package; `new`, `join`, `send`, `id` are thin clients).
 
 ## Data model (SQLite)

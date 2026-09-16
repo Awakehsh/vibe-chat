@@ -14,7 +14,7 @@ export function RoomPicker({ model, onPick, onClose }: { model: Model; onPick: (
   })
   void onClose
   return (
-    <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={3} paddingLeft={1} paddingRight={1}>
+    <box flexDirection="column" flexGrow={1} paddingLeft={1} paddingRight={1}>
       <text fg={theme.accent}>Switch room <span fg={theme.dim}>(Enter to pick, Esc to close)</span></text>
       <select
         options={options}
