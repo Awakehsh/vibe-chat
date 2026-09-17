@@ -27,7 +27,7 @@ import type { Model } from "../model.ts"
 import { CAT_FRAMES } from "./Cat.tsx"
 import { clip, humanSize, pollLines, reactionLine, rollLine } from "./format.ts"
 import { spriteCells } from "./Sprite.tsx"
-import { glyph, theme } from "./theme.ts"
+import { colorOf, glyph, theme } from "./theme.ts"
 
 export type Line = TextChunk[]
 
@@ -115,10 +115,15 @@ export function hasBlockMarkdown(text: string): boolean {
   return /(^|\n)\s*(```|#{1,6}\s|[-*+]\s|\d+\.\s|>\s)/.test(text)
 }
 
-/** Wrap a body under a prefix; continuation lines are indented. */
-function bodyLines(prefix: Line, prefixWidth: number, body: string, width: number, color: string, selfName: string): Line[] {
+/** Wrap a body under a prefix; continuation lines repeat the author's gutter so a run never loses its owner. */
+function bodyLines(prefix: Line, prefixWidth: number, cont: Line, body: string, width: number, color: string, selfName: string): Line[] {
   const wrapped = wrap(body, width - Math.max(prefixWidth, INDENT.length))
-  return wrapped.map((text, i) => (i === 0 ? [...prefix, ...bodyChunks(text, color, selfName)] : [...plain(INDENT), ...bodyChunks(text, color, selfName)]))
+  return wrapped.map((text, i) => (i === 0 ? [...prefix, ...bodyChunks(text, color, selfName)] : [...cont, ...bodyChunks(text, color, selfName)]))
+}
+
+/** `┊` in the author's colour, padded to the width of their first-line prefix. */
+function gutter(color: string, width: number): Line {
+  return [col(color, glyph.cont), ...plain(" ".repeat(Math.max(1, width - 1)))]
 }
 
 export interface MessageContext {
@@ -140,6 +145,7 @@ export function messageLines(m: Message, ctx: MessageContext): Line[] {
   const { model, selfId, selfName, width } = ctx
   const own = m.authorId === selfId
   const name = model.nameOf(m.authorId)
+  const who = own ? theme.self : colorOf(m.authorId)
   const lines: Line[] = []
 
   if (m.kind === "system") return [[col(theme.system, `${glyph.result}  ${m.body}`)]]
@@ -150,15 +156,17 @@ export function messageLines(m: Message, ctx: MessageContext): Line[] {
   }
 
   if (m.deletedAt) {
-    lines.push(own ? [col(theme.dim, `${glyph.self} (deleted)`)] : [col(theme.other, `${glyph.other} `), colb(theme.dim, name), col(theme.dim, ": (deleted)")])
+    lines.push(own ? [col(theme.dim, `${glyph.self} (deleted)`)] : [col(who, `${glyph.other} `), colb(theme.dim, name), col(theme.dim, ": (deleted)")])
     return lines
   }
 
   const suffix = m.editedAt ? " (edited)" : ""
   switch (m.kind) {
-    case "me":
-      lines.push(...bodyLines([col(theme.accent, `${glyph.me} `), colb(theme.name, name), plain(" ")[0]!], 3 + displayWidth(name), m.body + suffix, width, theme.self, selfName))
+    case "me": {
+      const w = 3 + displayWidth(name)
+      lines.push(...bodyLines([col(theme.accent, `${glyph.me} `), colb(who, name), plain(" ")[0]!], w, gutter(who, w), m.body + suffix, width, theme.self, selfName))
       break
+    }
     case "roll": {
       const meta = m.meta as RollMeta | undefined
       lines.push([col(theme.other, `${glyph.other} `), colb(theme.name, "Roll"), col(theme.dim, `(${m.body}) · ${own ? "you" : name}`)])
@@ -175,26 +183,28 @@ export function messageLines(m: Message, ctx: MessageContext): Line[] {
     }
     case "sticker": {
       const text = (m.meta as { text?: string } | undefined)?.text ?? m.body
-      lines.push([...authorPrefix(own, name), colb(theme.accent, text), col(theme.dim, " (sticker)")])
+      lines.push([...authorPrefix(own, name, who), colb(theme.accent, text), col(theme.dim, " (sticker)")])
       break
     }
     default: {
-      if (own) lines.push(...bodyLines([col(theme.self, `${glyph.self} `)], 2, m.body + suffix, width, theme.self, selfName))
-      else if (sameRun(ctx.prev, m)) lines.push(...bodyLines(plain(INDENT), 2, m.body + suffix, width, theme.name, selfName))
-      else lines.push(...bodyLines(authorPrefix(false, name), 4 + displayWidth(name), m.body + suffix, width, theme.name, selfName))
+      const w = 4 + displayWidth(name)
+      if (own) lines.push(...bodyLines([col(theme.self, `${glyph.self} `)], 2, gutter(theme.self, 2), m.body + suffix, width, theme.self, selfName))
+      else if (sameRun(ctx.prev, m)) lines.push(...bodyLines(gutter(who, w), w, gutter(who, w), m.body + suffix, width, theme.name, selfName))
+      else lines.push(...bodyLines(authorPrefix(false, name, who), w, gutter(who, w), m.body + suffix, width, theme.name, selfName))
     }
   }
 
-  for (const a of m.attachments) lines.push([col(theme.dim, `${INDENT}📎 ${a.name} (${humanSize(a.size)})`)])
+  const meta = gutter(who, own ? 2 : 4 + displayWidth(name))
+  for (const a of m.attachments) lines.push([...meta, col(theme.dim, `📎 ${a.name} (${humanSize(a.size)})`)])
   if (m.kind !== "poll") {
     const r = reactionLine(m.reactions)
-    if (r) lines.push([col(theme.reaction, `${INDENT}${r}`)])
+    if (r) lines.push([...meta, col(theme.reaction, r)])
   }
   return lines
 }
 
-function authorPrefix(own: boolean, name: string): Line {
-  return own ? [col(theme.self, `${glyph.self} `)] : [col(theme.other, `${glyph.other} `), colb(theme.name, name), col(theme.dim, ": ")]
+function authorPrefix(own: boolean, name: string, color: string): Line {
+  return own ? [col(theme.self, `${glyph.self} `)] : [col(color, `${glyph.other} `), colb(color, name), col(theme.dim, ": ")]
 }
 
 export function reactionLines(model: Model, target: Message, userId: string, emoji: string, width: number): Line[] {

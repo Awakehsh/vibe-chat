@@ -105,3 +105,18 @@ Fenced code, lists and headings render through the markdown component,
 component (kitty or sixel where supported, block characters elsewhere), each
 committed to scrollback as a block whose height is measured after layout.
 Inline markdown in ordinary lines is styled by the line builder.
+
+## D15 — Identity is a colour derived from the key, carried in a gutter (2026-09)
+
+D12 kept a run readable by dropping the repeated name, but a wrapped line or
+a run several screens back then carried no author at all, and every name was
+printed in the same white. Both channels are now used: the `⏺` and the name
+take a colour derived from the user id, which is the public key, and every
+line after the first repeats `┊` in that colour, padded to the column where
+the body starts. Attachment and reaction lines sit in the same gutter.
+
+The colour cannot be chosen, survives a rename, and differs between two
+people who picked the same name, so it is a weak identity signal rather than
+decoration. It is a second channel, never the only one: the name is still
+printed at the head of every run, so the transcript reads the same without
+colour. This does not reopen D7 — there is still one palette and no themes.

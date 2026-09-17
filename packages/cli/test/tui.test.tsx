@@ -4,6 +4,7 @@ import { Model } from "../src/model.ts"
 import { completions, parseCommand, parsePoll, parseStatus } from "../src/tui/commands.ts"
 import { pollLines, rollLine } from "../src/tui/format.ts"
 import { bodyChunks, commandLines, dividerLines, editedLines, hasBlockMarkdown, headerLines, messageLines, reactionLines, textOf, wrap } from "../src/tui/scrollback.ts"
+import { colorOf } from "../src/tui/theme.ts"
 import { autoStatusText } from "../src/autostatus.ts"
 
 const me = "M".repeat(43)
@@ -31,25 +32,37 @@ const msg = (over: Partial<Message>): Message => ({
 
 const lines = (m: Message, prev?: Message, width = 60) => messageLines(m, { model: model(), selfId: me, selfName: "小鹿", width, prev }).map(textOf)
 
+describe("identity colour", () => {
+  test("is stable per key and does not follow the name", () => {
+    expect(colorOf(bob)).toBe(colorOf(bob))
+    expect(colorOf(bob)).not.toBe(colorOf(me))
+  })
+
+  test("two keys that picked the same name still differ", () => {
+    const twin = "B".repeat(42) + "C"
+    expect(colorOf(twin)).not.toBe(colorOf(bob))
+  })
+})
+
 describe("message lines", () => {
   test("someone else's text carries the name; own text uses the prompt glyph", () => {
     expect(lines(msg({}))).toEqual(["⏺ bob: hello"])
     expect(lines(msg({ authorId: me, body: "on it" }))).toEqual(["> on it"])
   })
 
-  test("a second message from the same person within three minutes drops the name", () => {
+  test("a second message from the same person within three minutes drops the name but keeps their gutter", () => {
     const first = msg({})
     const second = msg({ msgId: "m2", seq: 2, body: "still here", createdAt: "2026-09-16T10:01:00.000Z" })
-    expect(lines(second, first)).toEqual(["  still here"])
+    expect(lines(second, first)).toEqual(["┊      still here"])
     const later = msg({ msgId: "m3", seq: 3, body: "back", createdAt: "2026-09-16T10:09:00.000Z" })
     expect(lines(later, first)).toEqual(["⏺ bob: back"])
   })
 
-  test("wraps long bodies with an indent and counts CJK as two columns", () => {
+  test("wraps long bodies under the author's gutter and counts CJK as two columns", () => {
     const out = lines(msg({ body: "这是一条很长的中文消息用来测试换行是否正确处理全角字符的宽度看看会不会错位" }), undefined, 30)
     expect(out.length).toBeGreaterThan(1)
     expect(out[0]).toMatch(/^⏺ bob: /)
-    expect(out[1]).toMatch(/^  /)
+    for (const l of out.slice(1)) expect(l).toMatch(/^┊ {6}\S/)
     for (const l of out) expect(Bun.stringWidth(l)).toBeLessThanOrEqual(30)
   })
 
@@ -57,7 +70,7 @@ describe("message lines", () => {
     expect(lines(msg({ kind: "system", authorId: "", body: "bob joined" }))).toEqual(["⎿  bob joined"])
     expect(lines(msg({ deletedAt: "t", body: "" }))).toEqual(["⏺ bob: (deleted)"])
     expect(lines(msg({ editedAt: "t" }))).toEqual(["⏺ bob: hello (edited)"])
-    expect(lines(msg({ attachments: [{ fileId: "f", name: "a.png", mime: "image/png", size: 2048 }], reactions: { "🔥": [me, bob] } }))).toEqual(["⏺ bob: hello", "  📎 a.png (2 KB)", "  🔥 2"])
+    expect(lines(msg({ attachments: [{ fileId: "f", name: "a.png", mime: "image/png", size: 2048 }], reactions: { "🔥": [me, bob] } }))).toEqual(["⏺ bob: hello", "┊      📎 a.png (2 KB)", "┊      🔥 2"])
   })
 
   test("roll and poll render as tool calls", () => {
