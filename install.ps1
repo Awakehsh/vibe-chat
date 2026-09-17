@@ -11,12 +11,19 @@ $tag = if ($env:VIBECHAT_VERSION) { $env:VIBECHAT_VERSION } else { (Invoke-RestM
 $url = "https://github.com/$repo/releases/download/$tag/vibechat-windows-x64.exe"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 $exe = Join-Path $dir "vibechat.exe"
+$old = Join-Path $dir "vibechat.exe.old"
+# A running .exe cannot be overwritten, but it can be renamed out of the way, so
+# reinstalling does not require closing the chat first.
+Remove-Item $old -Force -ErrorAction SilentlyContinue
+if (Test-Path $exe) { Rename-Item $exe $old -Force }
 Write-Host "downloading $url (about 93 MB, this takes a minute)"
 # Windows PowerShell 5.1 redraws the progress bar per chunk, which makes a download
 # of this size many times slower; it is restored below.
 $prevProgress = $ProgressPreference
 $ProgressPreference = "SilentlyContinue"
 try { Invoke-WebRequest -Uri $url -OutFile $exe -UseBasicParsing } finally { $ProgressPreference = $prevProgress }
+# Gone unless the previous copy is still open; then it goes at the next install.
+Remove-Item $old -Force -ErrorAction SilentlyContinue
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if (($userPath -split ";") -notcontains $dir) {
   [Environment]::SetEnvironmentVariable("Path", "$userPath;$dir", "User")
@@ -28,5 +35,12 @@ Write-Host "installed vibechat $(& $exe --version) to $exe"
 if ($env:VIBECHAT_JOIN) {
   Write-Host ""
   & $exe join $env:VIBECHAT_JOIN
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "vibechat is installed, but joining did not go through." -ForegroundColor Yellow
+    Write-Host "open a new terminal, run  vibechat  and type:"
+    Write-Host "  /join $env:VIBECHAT_JOIN"
+    exit 1
+  }
   Write-Host "run  vibechat  to open the chat"
 }

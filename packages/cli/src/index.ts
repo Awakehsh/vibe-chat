@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
-import { RequestError } from "./connection.ts"
+import { ConnectionError, RequestError } from "./connection.ts"
 import { UsageError, parseArgs } from "./args.ts"
 
-const VERSION = "0.5.0"
+const VERSION = "0.5.1"
 
 const HELP = `vibechat ${VERSION} — terminal chat that looks like work
 
@@ -62,6 +62,10 @@ main(process.argv.slice(2)).then(
     }
     if (e instanceof RequestError) {
       console.error(`server said ${e.code}: ${e.message}`)
+      process.exit(1)
+    }
+    if (e instanceof ConnectionError) {
+      console.error(e.message)
       process.exit(1)
     }
     console.error(e instanceof Error ? (e.stack ?? e.message) : String(e))

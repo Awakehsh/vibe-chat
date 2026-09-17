@@ -58,7 +58,7 @@ describe("handshake", () => {
 
   test("http info and invite landing", async () => {
     const info = await (await fetch(server.url + "/")).json()
-    expect(info).toEqual({ name: "vibechat", version: "0.5.0", protocol: 0 })
+    expect(info).toEqual({ name: "vibechat", version: "0.5.1", protocol: 0 })
     const res = await fetch(server.url + "/i/7K3MQ0VZ2P")
     expect(res.headers.get("content-type")).toContain("text/html")
     const page = await res.text()

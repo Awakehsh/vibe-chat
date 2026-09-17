@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { startServer, type RunningServer } from "@vibechat/server"
 import { Client } from "../src/client.ts"
+import { ConnectionError } from "../src/connection.ts"
 import { loadConfig } from "../src/config.ts"
 import { createIdentity, loadIdentity } from "../src/identity.ts"
 
@@ -38,6 +39,19 @@ describe("identity files", () => {
       const mode = (await import("node:fs")).statSync(join(cfg, "identity.json")).mode & 0o777
       expect(mode).toBe(0o600)
     }
+  })
+})
+
+describe("a server that is not there", () => {
+  test("is one line naming the host, not a stack trace", async () => {
+    const c = await client("nowhere")
+    // Port 1 is reserved and nothing listens on it.
+    const err = await c.joinRoom("127.0.0.1:1", "AAAAAAAAAA").catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ConnectionError)
+    expect((err as ConnectionError).host).toBe("127.0.0.1:1")
+    expect((err as ConnectionError).message).toContain("127.0.0.1:1")
+    expect((err as ConnectionError).message.split("\n")).toHaveLength(1)
+    c.close()
   })
 })
 

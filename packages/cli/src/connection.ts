@@ -25,6 +25,16 @@ export interface ConnectionEvents {
 
 type Reply = (OkFrame & Record<string, unknown>) | ErrFrame
 
+/** The link to a server went away. A network failure is reported as one line, not a stack. */
+export class ConnectionError extends Error {
+  constructor(
+    readonly host: string,
+    reason: string,
+  ) {
+    super(reason ? `${host}: ${reason}` : `could not reach ${host}`)
+  }
+}
+
 export class RequestError extends Error {
   constructor(
     readonly code: ErrFrame["code"],
@@ -91,7 +101,7 @@ export class Connection {
         if (s === "closed") {
           offSynced()
           offState()
-          reject(new Error(detail ?? "connection closed"))
+          reject(new ConnectionError(this.host, detail ?? ""))
         }
       })
       this.open()
@@ -163,7 +173,7 @@ export class Connection {
   private onClose(code: number, reason: string): void {
     if (this.heartbeat) clearInterval(this.heartbeat)
     this.heartbeat = undefined
-    for (const p of this.pending.values()) p.reject(new Error("connection closed"))
+    for (const p of this.pending.values()) p.reject(new ConnectionError(this.host, reason || `closed (${code})`))
     this.pending.clear()
     if (this.stopped || this.state === "closed") {
       if (this.state !== "closed") this.setState("closed", reason || `closed (${code})`)

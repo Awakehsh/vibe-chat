@@ -48,6 +48,13 @@ esac
 
 if [ -n "$INVITE" ]; then
   echo
-  "$DIR/vibechat" join "$INVITE"
-  echo "run  vibechat  to open the chat"
+  if "$DIR/vibechat" join "$INVITE"; then
+    echo "run  vibechat  to open the chat"
+  else
+    echo
+    echo "vibechat is installed, but joining did not go through."
+    echo "open a new terminal, run  vibechat  and type:"
+    echo "  /join $INVITE"
+    exit 1
+  fi
 fi
