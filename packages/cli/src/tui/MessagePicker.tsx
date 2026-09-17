@@ -4,10 +4,10 @@ import type { Model } from "../model.ts"
 import { clip } from "./format.ts"
 import { theme } from "./theme.ts"
 
-/** Recent messages as a list, newest first, for reply / edit / delete / react. */
+/** Recent messages as a list, newest first, for reply / edit / delete / react / save. */
 export function MessagePicker({ model, messages, title, onPick }: { model: Model; messages: Message[]; title: string; onPick: (m: Message) => void }) {
   const options: SelectOption[] = [...messages].reverse().map((m) => ({
-    name: `${model.nameOf(m.authorId)}: ${clip(m.body || `(${m.kind})`, 60)}`,
+    name: `${model.nameOf(m.authorId)}: ${clip(m.body || m.attachments.map((a) => a.name).join(", ") || `(${m.kind})`, 60)}`,
     description: "",
     value: m.msgId,
   }))

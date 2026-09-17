@@ -3,7 +3,7 @@ import type { Message } from "@vibechat/protocol"
 import { Model } from "../src/model.ts"
 import { completions, parseCommand, parsePoll, parseStatus } from "../src/tui/commands.ts"
 import { isMention, pollLines, rollLine } from "../src/tui/format.ts"
-import { bodyChunks, commandLines, dividerLines, editedLines, gapLines, hasBlockMarkdown, headerLines, isGap, messageLines, reactionLines, textOf, unreadLines, wrap } from "../src/tui/scrollback.ts"
+import { bodyChunks, commandLines, dividerLines, editedLines, gapLines, hasBlockMarkdown, headerLines, isGap, messageLines, reactionLines, textOf, unreadLines, unsentLines, wrap } from "../src/tui/scrollback.ts"
 import { colorOf, theme } from "../src/tui/theme.ts"
 import { autoStatusText } from "../src/autostatus.ts"
 
@@ -74,6 +74,15 @@ describe("time gaps and the unread mark", () => {
   })
 })
 
+describe("a message the server never took", () => {
+  test("is reported under the line, with the way to send it again", () => {
+    const line = unsentLines("ok 我明天看", 60).map(textOf)[0]!
+    expect(line).toBe('  ⎿  not sent: "ok 我明天看" · /retry')
+    expect(unsentLines("", 60).map(textOf)[0]!).toContain("(attachment)")
+    expect(Bun.stringWidth(unsentLines("x".repeat(200), 60).map(textOf)[0]!)).toBeLessThanOrEqual(60)
+  })
+})
+
 describe("identity colour", () => {
   test("is stable per key and does not follow the name", () => {
     expect(colorOf(bob)).toBe(colorOf(bob))
@@ -119,6 +128,14 @@ describe("message lines", () => {
     expect(lines(msg({ deletedAt: "t", body: "" }))).toEqual(["⏺ bob: (deleted)"])
     expect(lines(msg({ editedAt: "t" }))).toEqual(["⏺ bob: hello (edited)"])
     expect(lines(msg({ attachments: [{ fileId: "f", name: "a.png", mime: "image/png", size: 2048 }], reactions: { "🔥": [me, bob] } }))).toEqual(["⏺ bob: hello", "┊      📎 a.png (2 KB)", "┊      🔥 2"])
+  })
+
+  test("an attachment with no words keeps its author but prints no empty line", () => {
+    const att = [{ fileId: "f", name: "report.txt", mime: "text/plain", size: 12 }]
+    expect(lines(msg({ body: "", attachments: att }))).toEqual(["⏺ bob: ", "┊      📎 report.txt (12 B)"])
+    const first = msg({})
+    const run = msg({ msgId: "m2", seq: 2, body: "", attachments: att, createdAt: "2026-09-16T10:01:00.000Z" })
+    expect(lines(run, first)).toEqual(["┊      📎 report.txt (12 B)"])
   })
 
   test("roll and poll render as tool calls", () => {

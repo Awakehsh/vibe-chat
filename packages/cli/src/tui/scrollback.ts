@@ -194,8 +194,10 @@ export function messageLines(m: Message, ctx: MessageContext): Line[] {
     default: {
       const w = 4 + displayWidth(name)
       const body = own ? theme.self : theme.name
-      const head = sameRun(ctx.prev, m) ? gutter(rail, w) : authorPrefix(name, who, rail)
-      lines.push(...bodyLines(head, w, gutter(rail, w), m.body + suffix, width, body, selfName))
+      const run = sameRun(ctx.prev, m)
+      const text = m.body + suffix
+      // An attachment with no words still needs its author, but not an empty line under one.
+      if (text || !run) lines.push(...bodyLines(run ? gutter(rail, w) : authorPrefix(name, who, rail), w, gutter(rail, w), text, width, body, selfName))
     }
   }
 
@@ -220,6 +222,11 @@ export function reactionLines(model: Model, target: Message, userId: string, emo
 export function editedLines(model: Model, m: Message, width: number): Line[] {
   if (m.deletedAt) return [[col(theme.dim, `${INDENT}${glyph.result}  ${model.nameOf(m.authorId)} deleted a message`)]]
   return [[col(theme.dim, `${INDENT}${glyph.result}  ${model.nameOf(m.authorId)} edited: "${clip(m.body, Math.max(10, width - 24))}"`)]]
+}
+
+/** A message the server never took. The line above was already printed and cannot be taken back, so the failure is appended under it. */
+export function unsentLines(body: string, width: number): Line[] {
+  return [[col(theme.error, `${INDENT}${glyph.result}  not sent: `), col(theme.dim, `"${clip(body || "(attachment)", Math.max(10, width - 30))}" · /retry`)]]
 }
 
 /** True when enough silence sits between two messages to be worth a clock. */

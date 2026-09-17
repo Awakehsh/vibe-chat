@@ -18,6 +18,8 @@ export const COMMANDS: SlashCommand[] = [
   { name: "edit", args: "", description: "pick one of your messages to edit" },
   { name: "delete", args: "", description: "pick one of your messages to delete" },
   { name: "upload", args: "<path>", description: "send a file or image" },
+  { name: "save", args: "[dir]", description: "save a file someone sent, into dir or here" },
+  { name: "retry", args: "", description: "send again what never reached the server" },
   { name: "sticker", args: "<text>", description: "send big letters" },
   { name: "dm", args: "<name>", description: "open a direct message with a member" },
   { name: "me", args: "<action>", description: "* you <action>" },
@@ -34,6 +36,7 @@ export const COMMANDS: SlashCommand[] = [
   { name: "rename", args: "<name>", description: "owner: rename this room" },
   { name: "destroy", args: "", description: "owner: delete this room for everyone" },
   { name: "leave", args: "", description: "leave this room" },
+  { name: "clear", args: "", description: "clear the screen (also Ctrl+L)" },
   { name: "quit", args: "", description: "exit (also Ctrl+C twice)" },
 ]
 

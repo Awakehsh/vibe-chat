@@ -1,5 +1,6 @@
 import { useKeyboard, useRenderer } from "@opentui/react"
 import { formatInvite, parseInvite, socketUrlForHost, type Message } from "@vibechat/protocol"
+import { basename, join } from "node:path"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { AUTO_STATUS_EMOJI, autoStatusText, runningAgents } from "../autostatus.ts"
 import { Client, loadClient } from "../client.ts"
@@ -10,7 +11,7 @@ import { createIdentity, type Identity } from "../identity.ts"
 import { createNotifier } from "../notify.ts"
 import { createChime } from "../sound.ts"
 import { COMMANDS, parseCommand, parsePoll, parseStatus } from "./commands.ts"
-import { POLL_DIGITS, clip, isMention } from "./format.ts"
+import { POLL_DIGITS, clip, humanSize, isMention } from "./format.ts"
 import { MessagePicker } from "./MessagePicker.tsx"
 import { Onboarding } from "./Onboarding.tsx"
 import { Prompt, type PromptHandle, type PromptMode } from "./Prompt.tsx"
@@ -30,6 +31,7 @@ import {
   messageLines,
   reactionLines,
   unreadLines,
+  unsentLines,
   type Line,
 } from "./scrollback.ts"
 import { StatusLine } from "./StatusLine.tsx"
@@ -51,7 +53,8 @@ const PICK_COUNT = 12
 const IMAGE_COLS = 48
 const IMAGE_ROWS = 14
 
-type Picker = "rooms" | "reply" | "edit" | "delete" | "react"
+type Picker = "rooms" | "reply" | "edit" | "delete" | "react" | "save"
+type SendOpts = NonNullable<Parameters<Client["send"]>[2]>
 interface Compose {
   kind: "reply" | "edit" | "react"
   message: Message
@@ -94,6 +97,9 @@ export function App(props: AppProps) {
   const clientRef = useRef<Client | undefined>(undefined)
   const printedSeq = useRef(new Map<string, number>())
   const lastPrinted = useRef(new Map<string, Message>())
+  /** What the server never took, in the order it was typed; /retry drains it. */
+  const unsent = useRef<{ roomId: string; body: string; opts: SendOpts }[]>([])
+  const saveDir = useRef(".")
   /** Scrollback writes happen in order, including the asynchronous ones (markdown, images). */
   const queue = useRef(Promise.resolve())
   const liveRowsRef = useRef(4)
@@ -205,15 +211,22 @@ export function App(props: AppProps) {
   // be trusted to sit where it was. Erase the screen, start the footer from the
   // top again, and reprint the tail of the room so the view stays readable.
   const resizeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const repaintAfterResize = useCallback(() => {
+
+  /** Erases the screen and forgets what was printed; the caller decides what goes back. */
+  const resetScreen = useCallback((): boolean => {
     try {
       renderer.resetSplitFooterForReplay()
     } catch {
-      return
+      return false
     }
     queue.current = Promise.resolve()
     printed.current = 0
     preRowsRef.current = 0
+    return true
+  }, [renderer])
+
+  const repaintAfterResize = useCallback(() => {
+    if (!resetScreen()) return
     const c = clientRef.current
     const roomId = activeRef.current
     if (c && roomId && c.model.room(roomId)) {
@@ -223,7 +236,19 @@ export function App(props: AppProps) {
     } else {
       applyFooter()
     }
-  }, [renderer, replayRoom, applyFooter])
+  }, [resetScreen, replayRoom, applyFooter])
+
+  /** Clears the screen without reprinting the transcript; the divider says where you are. */
+  const clearScreen = useCallback(() => {
+    if (!resetScreen()) return
+    const c = clientRef.current
+    const roomId = activeRef.current
+    const r = c && roomId ? c.model.room(roomId) : undefined
+    if (!c || !r) return applyFooter()
+    const online = [...r.members.keys()].filter((id) => c.model.user(id)?.online).length
+    lastPrinted.current.delete(r.room.roomId)
+    print(dividerLines(c.model.titleOf(r.room.roomId), `${r.members.size} members · ${online} online`, width()))
+  }, [resetScreen, applyFooter, print, width])
 
   useEffect(() => {
     const onFocus = () => (focused.current = true)
@@ -347,6 +372,19 @@ export function App(props: AppProps) {
     applyFooter()
   }, [renderer, identity, rows, liveRows, tick, applyFooter])
 
+  /** Sends, and when the server never took it, says so under the line already printed. */
+  const sendMessage = useCallback(
+    async (c: Client, roomId: string, body: string, opts: SendOpts = {}) => {
+      try {
+        await c.send(roomId, body, opts)
+      } catch {
+        unsent.current.push({ roomId, body, opts })
+        print(unsentLines(body, width()))
+      }
+    },
+    [print, width],
+  )
+
   const exit = useCallback(() => {
     client?.close()
     props.onExit()
@@ -370,6 +408,7 @@ export function App(props: AppProps) {
       return
     }
     if (key.ctrl && key.name === "k" && client) setPicker((p) => (p === "rooms" ? undefined : "rooms"))
+    if (key.ctrl && key.name === "l") clearScreen()
   })
 
   const pickable = useCallback(
@@ -380,6 +419,7 @@ export function App(props: AppProps) {
       const base = room.messages.filter((m) => m.seq > 0 && m.kind !== "system" && !m.deletedAt)
       if (kind === "edit") return base.filter((m) => mine(m) && m.kind === "text").slice(-PICK_COUNT)
       if (kind === "delete") return base.filter((m) => mine(m) || owner).slice(-PICK_COUNT)
+      if (kind === "save") return base.filter((m) => m.attachments.length > 0).slice(-PICK_COUNT)
       return base.slice(-PICK_COUNT)
     },
     [room, identity],
@@ -397,7 +437,7 @@ export function App(props: AppProps) {
         if (active && !text.startsWith("/")) {
           setCompose(undefined)
           if (!room) return
-          if (active.kind === "reply") await client.send(room.room.roomId, text, { replyTo: active.message.msgId })
+          if (active.kind === "reply") await sendMessage(client, room.room.roomId, text, { replyTo: active.message.msgId })
           else if (active.kind === "edit") await client.edit(room.room.roomId, active.message.msgId, text)
           else if (active.kind === "react") await client.react(room.room.roomId, active.message.msgId, text.trim().slice(0, 16), true)
           return
@@ -405,7 +445,7 @@ export function App(props: AppProps) {
         const cmd = parseCommand(text)
         if (!cmd) {
           if (!room) return flash("no room selected: /new <name> or /join <host/TOKEN>")
-          await client.send(room.room.roomId, text)
+          await sendMessage(client, room.room.roomId, text)
           return
         }
         switch (cmd.name) {
@@ -515,13 +555,13 @@ export function App(props: AppProps) {
             const path = cmd.rest.replace(/^~(?=\/)/, process.env.HOME ?? "~")
             flash("uploading…", 30000)
             const att = await client.upload(room.room.roomId, path)
-            await client.send(room.room.roomId, "", { attachments: [att.fileId] })
+            await sendMessage(client, room.room.roomId, "", { attachments: [att.fileId] })
             return flash(`sent ${att.name}`)
           }
           case "sticker":
             if (!room) return flash("no room selected")
             if (!cmd.rest) return flash("usage: /sticker <text>")
-            await client.send(room.room.roomId, cmd.rest.slice(0, 16), { kind: "sticker", meta: { text: cmd.rest.slice(0, 16), font: "block" } })
+            await sendMessage(client, room.room.roomId, cmd.rest.slice(0, 16), { kind: "sticker", meta: { text: cmd.rest.slice(0, 16), font: "block" } })
             return
           case "dm": {
             if (!room) return flash("no room selected")
@@ -534,17 +574,17 @@ export function App(props: AppProps) {
           case "me":
             if (!room) return flash("no room selected")
             if (!cmd.rest) return flash("usage: /me <action>")
-            await client.send(room.room.roomId, cmd.rest, { kind: "me" })
+            await sendMessage(client, room.room.roomId, cmd.rest, { kind: "me" })
             return
           case "roll":
             if (!room) return flash("no room selected")
-            await client.send(room.room.roomId, cmd.rest || "1d6", { kind: "roll" })
+            await sendMessage(client, room.room.roomId, cmd.rest || "1d6", { kind: "roll" })
             return
           case "poll": {
             if (!room) return flash("no room selected")
             const poll = parsePoll(cmd.rest)
             if (typeof poll === "string") return flash(poll)
-            await client.send(room.room.roomId, poll.question, { kind: "poll", meta: { options: poll.options } })
+            await sendMessage(client, room.room.roomId, poll.question, { kind: "poll", meta: { options: poll.options } })
             return
           }
           case "vote": {
@@ -627,6 +667,22 @@ export function App(props: AppProps) {
             setActiveRoomId(undefined)
             return flash("left the room")
           }
+          case "save": {
+            if (!room) return flash("no room selected")
+            if (pickable("save").length === 0) return flash("no file has been sent here")
+            saveDir.current = cmd.rest.trim() || "."
+            setPicker("save")
+            return
+          }
+          case "retry": {
+            const pending = unsent.current
+            if (pending.length === 0) return flash("nothing to retry")
+            unsent.current = []
+            for (const u of pending) await sendMessage(client, u.roomId, u.body, u.opts)
+            return
+          }
+          case "clear":
+            return clearScreen()
           case "quit":
             return exit()
           default:
@@ -637,13 +693,33 @@ export function App(props: AppProps) {
         flash(e instanceof Error ? e.message : String(e), 6000)
       }
     },
-    [client, identity, activeRoomId, flash, exit, links, print, props.insecure, width, pickable, chime],
+    [client, identity, activeRoomId, flash, exit, links, print, props.insecure, width, pickable, chime, sendMessage, clearScreen],
   )
 
   const onPickMessage = useCallback(
     async (kind: Picker, m: Message) => {
       setPicker(undefined)
       if (!client || !room) return
+      if (kind === "save") {
+        const dir = saveDir.current.replace(/^~(?=\/)/, process.env.HOME ?? "~")
+        try {
+          const written: string[] = []
+          for (const a of m.attachments) {
+            const ref = client.fileUrl(m.roomId, a.fileId)
+            if (!ref) continue
+            const res = await fetch(ref.url, { headers: { authorization: `Bearer ${ref.session}` } })
+            if (!res.ok) throw new Error(`${a.name}: server said ${res.status}`)
+            // The name came off the wire; only its last segment may reach the filesystem.
+            const path = join(dir, basename(a.name))
+            await Bun.write(path, res)
+            written.push(`${path} (${humanSize(a.size)})`)
+          }
+          print(commandLines("/save", written.length ? written : ["that message carries no file"], width()))
+        } catch (e) {
+          flash(e instanceof Error ? e.message : String(e), 6000)
+        }
+        return
+      }
       if (kind === "delete") {
         try {
           await client.remove(room.room.roomId, m.msgId)
@@ -705,7 +781,7 @@ export function App(props: AppProps) {
         </box>
       ) : picker && model ? (
         <box height={pickerRows} flexShrink={0}>
-          <MessagePicker model={model} messages={pickable(picker)} title={picker === "reply" ? "Reply to" : picker === "edit" ? "Edit" : picker === "delete" ? "Delete" : "React to"} onPick={(m) => void onPickMessage(picker, m)} />
+          <MessagePicker model={model} messages={pickable(picker)} title={picker === "reply" ? "Reply to" : picker === "edit" ? "Edit" : picker === "delete" ? "Delete" : picker === "save" ? "Save from" : "React to"} onPick={(m) => void onPickMessage(picker, m)} />
         </box>
       ) : null}
       <Prompt ref={promptRef} active={!picker} placeholder={placeholder} onSubmit={(t) => void run(t)} onTyping={() => activeRoomId && client?.typing(activeRoomId)} onMode={setPromptMode} onLayout={setPromptRows} />
