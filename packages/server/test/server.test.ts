@@ -58,10 +58,30 @@ describe("handshake", () => {
 
   test("http info and invite landing", async () => {
     const info = await (await fetch(server.url + "/")).json()
-    expect(info).toEqual({ name: "vibechat", version: "0.3.0", protocol: 0 })
-    const page = await (await fetch(server.url + "/i/7K3MQ0VZ2P")).text()
+    expect(info).toEqual({ name: "vibechat", version: "0.4.0", protocol: 0 })
+    const res = await fetch(server.url + "/i/7K3MQ0VZ2P")
+    expect(res.headers.get("content-type")).toContain("text/html")
+    const page = await res.text()
     expect(page).toContain("vibechat join")
     expect(page).toContain("/7K3MQ0VZ2P")
+  })
+
+  test("the invite page carries one line per system that installs and joins", async () => {
+    const page = await (await fetch(server.url + "/i/7k3mq0vz2p")).text()
+    const host = new URL(server.url).host
+    // A lowercase token in the link still names the room the uppercase one does.
+    expect(page).toContain(`sh -s -- ${host}/7K3MQ0VZ2P`)
+    expect(page).toContain(`$env:VIBECHAT_JOIN='${host}/7K3MQ0VZ2P'`)
+    expect(page).toContain("/install.sh")
+    expect(page).toContain("/install.ps1")
+    expect(page).not.toContain("github.com/vibe-chat/vibe-chat")
+  })
+
+  test("the installers are served by the server the invite points at", async () => {
+    const sh = await fetch(server.url + "/install.sh")
+    expect(sh.headers.get("content-type")).toContain("text/plain")
+    expect(await sh.text()).toContain("VIBECHAT_INSTALL_DIR")
+    expect(await (await fetch(server.url + "/install.ps1")).text()).toContain("VIBECHAT_JOIN")
   })
 })
 

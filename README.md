@@ -52,6 +52,14 @@ to block characters elsewhere.
 
 ## Install
 
+### You were sent an invite
+
+Open the link. The page gives you one line to paste for your system, which
+installs vibechat, puts it on your PATH and joins the room in the same step.
+Then run `vibechat`.
+
+### On your own
+
 Any one of these puts a `vibechat` command on your PATH. It is a single
 binary; nothing else needs to be installed.
 
@@ -60,16 +68,22 @@ brew install awakehsh/tap/vibechat        # Homebrew (macOS / Linux)
 curl -fsSL https://raw.githubusercontent.com/Awakehsh/vibe-chat/main/install.sh | sh   # macOS / Linux
 ```
 
-Windows, in PowerShell:
+Windows, in PowerShell (Homebrew is macOS and Linux only):
 
 ```powershell
 irm https://raw.githubusercontent.com/Awakehsh/vibe-chat/main/install.ps1 | iex   # downloads and adds to PATH
 scoop bucket add awakehsh https://github.com/Awakehsh/scoop-bucket; scoop install vibechat
 ```
 
+Both installers take an invite and join once they are done: pass it as an
+argument to `install.sh`, or set `$env:VIBECHAT_JOIN` before `install.ps1`.
+Every server also serves them at `/install.sh` and `/install.ps1`, which is
+what the invite page points at.
+
 Or download `vibechat-<os>-<arch>` from the [releases](../../releases) page
 and put it on your PATH. On macOS a downloaded binary may need
-`xattr -d com.apple.quarantine vibechat` once.
+`xattr -d com.apple.quarantine vibechat` once. An unsigned Windows binary
+raises a SmartScreen warning the first time: More info, then Run anyway.
 
 ## Commands
 

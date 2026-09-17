@@ -1,5 +1,7 @@
-# Installs the latest vibechat release for Windows into %LOCALAPPDATA%\vibechat\bin and adds it to your PATH.
+# Installs the latest vibechat release for Windows into %LOCALAPPDATA%\vibechat\bin, adds it to
+# your PATH, and joins a room when $env:VIBECHAT_JOIN is set.
 #   irm https://raw.githubusercontent.com/Awakehsh/vibe-chat/main/install.ps1 | iex
+#   $env:VIBECHAT_JOIN='<server>/TOKEN'; irm <server>/install.ps1 | iex
 $ErrorActionPreference = "Stop"
 $repo = "Awakehsh/vibe-chat"
 $dir = if ($env:VIBECHAT_INSTALL_DIR) { $env:VIBECHAT_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "vibechat\bin" }
@@ -18,3 +20,9 @@ if (($userPath -split ";") -notcontains $dir) {
   Write-Host "added $dir to your user PATH (open a new terminal to pick it up)"
 }
 Write-Host "installed vibechat $(& $exe --version) to $exe"
+
+if ($env:VIBECHAT_JOIN) {
+  Write-Host ""
+  & $exe join $env:VIBECHAT_JOIN
+  Write-Host "run  vibechat  to open the chat"
+}

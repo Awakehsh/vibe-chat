@@ -165,3 +165,21 @@ until `/retry` drains it, so nothing typed while the link was down is lost.
 This is the shape every later change of a message already had — a reaction, an
 edit, a deletion all print as new lines — and it is why there is no pending or
 sending state: a mark that has to be revised cannot exist here.
+
+## D19 — The invite link is the install instruction (2026-09)
+
+An invite used to be a token, and installing was a separate page in a
+different place — the landing page even pointed at a repository that does not
+exist. Someone who was sent an invite had to find the installer, run it, work
+out that the binary was not on their PATH, and then type a join command.
+
+The page at `/i/<TOKEN>` now names the room and carries one line per system
+that installs vibechat and joins in the same step, and every server serves
+`/install.sh` and `/install.ps1` itself, so the commands point at the host the
+invite already names instead of a raw file URL. Both installers take the
+invite and both put the binary on the PATH — on Unix by writing the line into
+the shell's own rc file, which is what the Windows one already did.
+
+The scripts are embedded in the server binary as text at build time, so there
+is one copy of each in the repository and no way for the served version to
+drift from the one in git.

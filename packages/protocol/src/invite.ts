@@ -55,13 +55,24 @@ function isPrivateHost(hostname: string): boolean {
   return hostname.endsWith(".local")
 }
 
-/** Turn an invite host into the WebSocket URL of its server. */
-export function socketUrlForHost(host: string, opts: { insecure?: boolean } = {}): string {
+/** An invite host, split and told whether it is reached without TLS. */
+function parseHost(host: string, insecure?: boolean): { authority: string; plain: boolean } {
   const m = /^(\[[^\]]+\]|[^:]+)(?::(\d+))?$/.exec(host)
   if (!m) throw new Error(`invalid host: ${host}`)
   const hostname = m[1]!
   const port = m[2]
-  const plain = opts.insecure === true || (port !== undefined && port !== "443" && isPrivateHost(hostname)) || (port === undefined && LOOPBACK.has(hostname))
-  const scheme = plain ? "ws" : "wss"
-  return `${scheme}://${hostname}${port ? `:${port}` : ""}/ws`
+  const plain = insecure === true || (port !== undefined && port !== "443" && isPrivateHost(hostname)) || (port === undefined && LOOPBACK.has(hostname))
+  return { authority: `${hostname}${port ? `:${port}` : ""}`, plain }
+}
+
+/** Turn an invite host into the WebSocket URL of its server. */
+export function socketUrlForHost(host: string, opts: { insecure?: boolean } = {}): string {
+  const { authority, plain } = parseHost(host, opts.insecure)
+  return `${plain ? "ws" : "wss"}://${authority}/ws`
+}
+
+/** Turn an invite host into the origin its pages and installers are served from. */
+export function originForHost(host: string, opts: { insecure?: boolean } = {}): string {
+  const { authority, plain } = parseHost(host, opts.insecure)
+  return `${plain ? "http" : "https"}://${authority}`
 }

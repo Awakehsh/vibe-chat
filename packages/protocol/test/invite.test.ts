@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { formatInvite, generateInviteToken, isInviteToken, parseInvite, socketUrlForHost } from "../src/index.ts"
+import { formatInvite, generateInviteToken, isInviteToken, originForHost, parseInvite, socketUrlForHost } from "../src/index.ts"
 
 describe("invite tokens", () => {
   test("generated tokens are valid and vary", () => {
@@ -39,5 +39,18 @@ describe("invite tokens", () => {
     expect(socketUrlForHost("chat.example.com:8443")).toBe("wss://chat.example.com:8443/ws")
     expect(socketUrlForHost("mac.tail1234.ts.net")).toBe("wss://mac.tail1234.ts.net/ws")
     expect(socketUrlForHost("chat.example.com", { insecure: true })).toBe("ws://chat.example.com/ws")
+  })
+})
+
+describe("invite origins", () => {
+  test("follow the same TLS rule as the socket URL", () => {
+    expect(originForHost("chat.example.com")).toBe("https://chat.example.com")
+    expect(originForHost("chat.example.com:8443")).toBe("https://chat.example.com:8443")
+    expect(originForHost("localhost:7788")).toBe("http://localhost:7788")
+    expect(originForHost("127.0.0.1:7788")).toBe("http://127.0.0.1:7788")
+    expect(originForHost("chat.example.com", { insecure: true })).toBe("http://chat.example.com")
+    for (const host of ["chat.example.com", "localhost:7788", "192.168.1.9:7788"]) {
+      expect(originForHost(host).startsWith("https")).toBe(socketUrlForHost(host).startsWith("wss"))
+    }
   })
 })

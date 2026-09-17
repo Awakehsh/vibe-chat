@@ -1,10 +1,13 @@
 import type { Server } from "bun"
 import { join } from "node:path"
+import installPs1 from "../../../install.ps1" with { type: "text" }
+import installSh from "../../../install.sh" with { type: "text" }
 import {
   HEARTBEAT_TIMEOUT_MS,
   NONCE_TTL_MS,
   PROTOCOL_VERSION,
   SESSION_GRACE_MS,
+  originForHost,
   parseClientFrame,
   randomNonce,
   verifyAuth,
@@ -19,6 +22,52 @@ import { handleFireAndForget, handleRequest } from "./handlers.ts"
 import { Hub, type Conn, type Socket } from "./hub.ts"
 import { TokenBucket } from "./ratelimit.ts"
 import { Store } from "./store.ts"
+
+const script = (body: string): Response => new Response(body, { headers: { "content-type": "text/plain; charset=utf-8" } })
+
+const escape = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!)
+
+/**
+ * What someone sees when they open an invite link: one line to paste for their
+ * system, which installs the client and joins the room in the same step.
+ */
+function invitePage(host: string, token: string, roomName: string | undefined): string {
+  const origin = originForHost(host)
+  const invite = `${host}/${token}`
+  const title = roomName ? `Join ${roomName} on vibechat` : "vibechat invite"
+  const unix = `curl -fsSL ${origin}/install.sh | sh -s -- ${invite}`
+  const win = `$env:VIBECHAT_JOIN='${invite}'; irm ${origin}/install.ps1 | iex`
+  return `<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escape(title)}</title>
+<style>
+  :root { color-scheme: dark light }
+  body { margin: 0; padding: 2rem 1rem; background: #1e1e1e; color: #c8c8c8;
+         font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace }
+  main { max-width: 46rem; margin: 0 auto }
+  h1 { font-size: 1.25rem; color: #fff; margin: 0 0 .25rem }
+  p { margin: .25rem 0 1.5rem; color: #6c6c6c }
+  h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
+       color: #d97757; margin: 1.5rem 0 .5rem }
+  pre { background: #2a2a2a; border: 1px solid #444; border-radius: 6px;
+        padding: .75rem 1rem; overflow-x: auto; margin: 0; color: #e0e0e0 }
+  footer { margin-top: 2rem; color: #6c6c6c }
+  a { color: #5fafff }
+</style>
+<main>
+  <h1>${escape(title)}</h1>
+  <p>Paste one line. It installs vibechat and joins the room.</p>
+  <h2>macOS · Linux</h2>
+  <pre>${escape(unix)}</pre>
+  <h2>Windows · PowerShell</h2>
+  <pre>${escape(win)}</pre>
+  <h2>Already installed</h2>
+  <pre>vibechat join ${escape(invite)}</pre>
+  <footer>Then run <code>vibechat</code> · <a href="https://github.com/Awakehsh/vibe-chat">github.com/Awakehsh/vibe-chat</a></footer>
+</main>
+`
+}
 
 export interface RunningServer {
   port: number
@@ -184,11 +233,14 @@ export async function startServer(partial: Partial<ServerConfig> = {}): Promise<
       if (url.pathname === "/") {
         return Response.json({ name: config.name, version: config.version, protocol: PROTOCOL_VERSION })
       }
+      if (url.pathname === "/install.sh") return script(installSh)
+      if (url.pathname === "/install.ps1") return script(installPs1)
       if (url.pathname.startsWith("/i/")) {
-        const token = url.pathname.slice(3).replace(/\/$/, "")
+        const token = url.pathname.slice(3).replace(/\/$/, "").toUpperCase()
         const host = req.headers.get("host") ?? url.host
-        return new Response(`vibechat invite\n\n  vibechat join ${host}/${token}\n\nInstall: https://github.com/vibe-chat/vibe-chat\n`, {
-          headers: { "content-type": "text/plain; charset=utf-8" },
+        const room = store.getRoomByInvite(token)
+        return new Response(invitePage(host, token, room?.name), {
+          headers: { "content-type": "text/html; charset=utf-8" },
         })
       }
       if (url.pathname.startsWith("/files/")) {

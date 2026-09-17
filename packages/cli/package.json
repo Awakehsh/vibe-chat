@@ -1,6 +1,6 @@
 {
   "name": "@vibechat/cli",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Terminal chat that looks like an AI coding agent session",
   "license": "MIT",
