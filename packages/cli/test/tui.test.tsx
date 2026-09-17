@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import type { Message } from "@vibechat/protocol"
 import { Model } from "../src/model.ts"
 import { completions, parseCommand, parsePoll, parseStatus } from "../src/tui/commands.ts"
-import { pollLines, rollLine } from "../src/tui/format.ts"
+import { isMention, pollLines, rollLine } from "../src/tui/format.ts"
 import { bodyChunks, commandLines, dividerLines, editedLines, hasBlockMarkdown, headerLines, messageLines, reactionLines, textOf, wrap } from "../src/tui/scrollback.ts"
 import { colorOf } from "../src/tui/theme.ts"
 import { autoStatusText } from "../src/autostatus.ts"
@@ -31,6 +31,16 @@ const msg = (over: Partial<Message>): Message => ({
 })
 
 const lines = (m: Message, prev?: Message, width = 60) => messageLines(m, { model: model(), selfId: me, selfName: "小鹿", width, prev }).map(textOf)
+
+describe("mentions", () => {
+  test("a CJK name is closed by the token charset, not an ASCII word boundary", () => {
+    expect(isMention(msg({ body: "@小鹿 在吗" }), "小鹿")).toBe(true)
+    expect(isMention(msg({ body: "hey @小鹿" }), "小鹿")).toBe(true)
+    expect(isMention(msg({ body: "@小鹿鹿 在吗" }), "小鹿")).toBe(false)
+    expect(isMention(msg({ body: "hey @bob" }), "bob")).toBe(true)
+    expect(isMention(msg({ body: "hey @bobby" }), "bob")).toBe(false)
+  })
+})
 
 describe("identity colour", () => {
   test("is stable per key and does not follow the name", () => {

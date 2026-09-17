@@ -34,6 +34,7 @@ export function clip(text: string, max: number): string {
   return one.length > max ? one.slice(0, max - 1) + "…" : one
 }
 
+/** `\b` is an ASCII word boundary, so it never closes a CJK name; the token charset does. */
 export function isMention(m: Message, name: string): boolean {
-  return new RegExp(`@${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(m.body)
+  return new RegExp(`@${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}_])`, "iu").test(m.body)
 }
