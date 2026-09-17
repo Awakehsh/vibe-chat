@@ -183,3 +183,19 @@ the shell's own rc file, which is what the Windows one already did.
 The scripts are embedded in the server binary as text at build time, so there
 is one copy of each in the repository and no way for the served version to
 drift from the one in git.
+
+## D20 — Updating is a command, not something that happens to you (2026-09)
+
+There is no update check and no silent self-replacement. `vibechat update`
+asks the release list for the latest tag, downloads the asset built for this
+machine, and renames it over the running binary — a new file and a rename, so
+the copy in use stays intact and, on Apple silicon, the signature stays valid;
+overwriting in place does not. On Windows the running `.exe` is renamed aside
+first, since it cannot be replaced while open.
+
+A binary a package manager owns is refused rather than replaced: `brew` and
+`scoop` keep their own record of what is installed, and writing underneath
+them leaves that record lying. The command names the right one instead.
+
+Nothing runs on a timer and nothing phones home while you chat. Hearing about
+a new version is a separate question, still unanswered.

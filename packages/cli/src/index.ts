@@ -2,7 +2,7 @@
 import { RequestError } from "./connection.ts"
 import { UsageError, parseArgs } from "./args.ts"
 
-const VERSION = "0.4.1"
+const VERSION = "0.5.0"
 
 const HELP = `vibechat ${VERSION} — terminal chat that looks like work
 
@@ -14,6 +14,7 @@ usage:
   vibechat serve [--port N] [--data-dir DIR] [--tunnel]
                                     run a server; --tunnel exposes it with Tailscale Funnel
   vibechat id [export|import <file>] show or move your identity
+  vibechat update                   replace this binary with the latest release
 
 options:
   --host <host[:port]>   server for new/join when the invite has no host
@@ -45,6 +46,8 @@ async function main(argv: string[]): Promise<void> {
       return (await import("./commands/send.ts")).send(sub)
     case "id":
       return (await import("./commands/id.ts")).id(sub)
+    case "update":
+      return (await import("./commands/update.ts")).update(sub, VERSION)
     default:
       throw new UsageError(`unknown command "${command}"\n\n${HELP}`)
   }

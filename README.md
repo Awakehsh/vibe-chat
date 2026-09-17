@@ -95,6 +95,7 @@ raises a SmartScreen warning the first time: More info, then Run anyway.
 | `vibechat send --room <name> <text>` | post a message from a script or hook |
 | `vibechat serve [--port N] [--data-dir DIR] [--tunnel]` | run a server; `--tunnel` exposes it via Tailscale Funnel |
 | `vibechat id` | show your identity and export it for another machine |
+| `vibechat update` | replace this binary with the latest release |
 
 ## Self-hosting
 
