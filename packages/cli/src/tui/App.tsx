@@ -138,9 +138,13 @@ export function App(props: AppProps) {
       queue.current = queue.current
         .then(async () => {
           applyFooter(estimate)
-          printed.current += await run()
-          applyFooter()
-          setTick((t) => t + 1)
+          try {
+            printed.current += await run()
+          } finally {
+            // An image that fails to decode would otherwise leave the footer short by its estimate.
+            applyFooter()
+            setTick((t) => t + 1)
+          }
         })
         .catch(() => undefined)
     },

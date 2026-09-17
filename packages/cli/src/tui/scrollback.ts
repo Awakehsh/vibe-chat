@@ -359,10 +359,29 @@ export function commitSticker(renderer: CliRenderer, text: string): Promise<numb
 }
 
 /** An image, drawn with whatever protocol the terminal supports (kitty, sixel, or blocks). */
-export function commitImage(renderer: CliRenderer, bytes: Uint8Array, cols: number, rows: number): Promise<number> {
-  return commitSurface(renderer, (ctx, width) => {
-    const box = new BoxRenderable(ctx, { id: `sb-${seq++}`, width, paddingLeft: 2, backgroundColor: "transparent" })
-    box.add(new ImageRenderable(ctx, { id: `sb-${seq++}`, source: bytes, fit: "fit", protocol: "auto", width: Math.min(cols, width - 2), height: rows }))
-    return box
-  })
+export async function commitImage(renderer: CliRenderer, bytes: Uint8Array, cols: number, rows: number): Promise<number> {
+  const surface = renderer.createScrollbackSurface({ startOnNewLine: true })
+  try {
+    const box = new BoxRenderable(surface.renderContext, { id: `sb-${seq++}`, width: surface.width, paddingLeft: 2, backgroundColor: "transparent" })
+    const image = new ImageRenderable(surface.renderContext, {
+      id: `sb-${seq++}`,
+      source: bytes,
+      fit: "fit",
+      protocol: "auto",
+      width: Math.min(cols, surface.width - 2),
+      height: rows,
+    })
+    box.add(image)
+    surface.root.add(box)
+    // The pixels are decoded off the render path; committing before that is done
+    // reserves the rows and leaves them empty.
+    await image.loadPromise
+    surface.render()
+    await surface.settle(1500)
+    const height = surface.height
+    if (height > 0) surface.commitRows(0, height, { trailingNewline: true })
+    return height
+  } finally {
+    surface.destroy()
+  }
 }
