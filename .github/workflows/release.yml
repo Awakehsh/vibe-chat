@@ -27,7 +27,7 @@ jobs:
             target: bun-windows-x64
             name: vibechat-windows-x64.exe
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
@@ -35,7 +35,7 @@ jobs:
       - run: bun run typecheck
       - run: bun test
       - run: bun build --compile --minify --target=${{ matrix.target }} packages/cli/src/index.ts --outfile dist/${{ matrix.name }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.name }}
           path: dist/${{ matrix.name }}
@@ -46,11 +46,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
@@ -60,7 +60,7 @@ jobs:
           bun scripts/brew-formula.ts "${GITHUB_REF_NAME#v}" dist/checksums.txt > dist/vibechat.rb
           bun scripts/scoop-manifest.ts "${GITHUB_REF_NAME#v}" dist/checksums.txt > dist/vibechat.json
           ls -la dist
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/vibechat-*
