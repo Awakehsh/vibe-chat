@@ -161,7 +161,7 @@ export function messageLines(m: Message, ctx: MessageContext): Line[] {
   }
 
   if (m.deletedAt) {
-    lines.push(own ? [col(theme.dim, `${glyph.self} (deleted)`)] : [col(rail, `${glyph.other} `), colb(theme.dim, name), col(theme.dim, ": (deleted)")])
+    lines.push([col(rail, `${glyph.other} `), colb(theme.dim, name), col(theme.dim, ": (deleted)")])
     return lines
   }
 
@@ -188,18 +188,18 @@ export function messageLines(m: Message, ctx: MessageContext): Line[] {
     }
     case "sticker": {
       const text = (m.meta as { text?: string } | undefined)?.text ?? m.body
-      lines.push([...authorPrefix(own, name, who, rail), colb(theme.accent, text), col(theme.dim, " (sticker)")])
+      lines.push([...authorPrefix(name, who, rail), colb(theme.accent, text), col(theme.dim, " (sticker)")])
       break
     }
     default: {
       const w = 4 + displayWidth(name)
-      if (own) lines.push(...bodyLines([col(theme.self, `${glyph.self} `)], 2, gutter(theme.self, 2), m.body + suffix, width, theme.self, selfName))
-      else if (sameRun(ctx.prev, m)) lines.push(...bodyLines(gutter(rail, w), w, gutter(rail, w), m.body + suffix, width, theme.name, selfName))
-      else lines.push(...bodyLines(authorPrefix(false, name, who, rail), w, gutter(rail, w), m.body + suffix, width, theme.name, selfName))
+      const body = own ? theme.self : theme.name
+      const head = sameRun(ctx.prev, m) ? gutter(rail, w) : authorPrefix(name, who, rail)
+      lines.push(...bodyLines(head, w, gutter(rail, w), m.body + suffix, width, body, selfName))
     }
   }
 
-  const meta = gutter(rail, own ? 2 : 4 + displayWidth(name))
+  const meta = gutter(rail, 4 + displayWidth(name))
   for (const a of m.attachments) lines.push([...meta, col(theme.dim, `📎 ${a.name} (${humanSize(a.size)})`)])
   if (m.kind !== "poll") {
     const r = reactionLine(m.reactions)
@@ -208,8 +208,9 @@ export function messageLines(m: Message, ctx: MessageContext): Line[] {
   return lines
 }
 
-function authorPrefix(own: boolean, name: string, color: string, rail: string): Line {
-  return own ? [col(theme.self, `${glyph.self} `)] : [col(rail, `${glyph.other} `), colb(color, name), col(theme.dim, ": ")]
+/** Everyone is named, your own messages included; `>` is the prompt, not an author. */
+function authorPrefix(name: string, color: string, rail: string): Line {
+  return [col(rail, `${glyph.other} `), colb(color, name), col(theme.dim, ": ")]
 }
 
 export function reactionLines(model: Model, target: Message, userId: string, emoji: string, width: number): Line[] {

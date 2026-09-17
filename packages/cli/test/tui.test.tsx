@@ -87,9 +87,15 @@ describe("identity colour", () => {
 })
 
 describe("message lines", () => {
-  test("someone else's text carries the name; own text uses the prompt glyph", () => {
+  test("every message carries its author, your own included", () => {
     expect(lines(msg({}))).toEqual(["⏺ bob: hello"])
-    expect(lines(msg({ authorId: me, body: "on it" }))).toEqual(["> on it"])
+    expect(lines(msg({ authorId: me, body: "on it" }))).toEqual(["⏺ 小鹿: on it"])
+  })
+
+  test("your own consecutive messages group into a run like anyone else's", () => {
+    const first = msg({ authorId: me, body: "on it" })
+    const second = msg({ authorId: me, msgId: "m2", seq: 2, body: "done", createdAt: "2026-09-16T10:01:00.000Z" })
+    expect(lines(second, first)).toEqual(["┊       done"])
   })
 
   test("a second message from the same person within three minutes drops the name but keeps their gutter", () => {

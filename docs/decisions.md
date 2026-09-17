@@ -139,3 +139,17 @@ The third mark is on the message itself: one that names you takes the accent
 down its whole left edge — the `⏺` and every `┊` under it — while the name
 keeps the author's own colour from D15. The highlight on the `@name` alone
 was invisible while scrolling; a coloured edge is not.
+
+## D17 — Your own messages carry your name too (2026-09)
+
+D12 gave your own messages `>` and no name, mirroring the prompt of an agent
+CLI. In a room with other people that reads as a second identity nobody can
+name, and in a room on your own it is the only thing on screen, so the
+transcript looks empty of authors either way. Every message now goes through
+the same author prefix, yours included, and your own runs group like anyone
+else's.
+
+`>` keeps its one job: it marks the prompt you type into, and no longer
+doubles as an author. Your name stays in the quiet grey while other people
+keep the colour from D15, so the asymmetry that matters — what you already
+know you said, against what someone else just said — survives.
