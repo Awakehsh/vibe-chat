@@ -59,6 +59,21 @@ export function completions(text: string): SlashCommand[] {
   return COMMANDS.filter((c) => c.name.startsWith(m[1]!))
 }
 
+/**
+ * A terminal drops a dragged file into the prompt as its path: quoted, or with
+ * the spaces backslashed. Returns the path when the text is nothing else.
+ */
+export function droppedPath(text: string, platform: string = process.platform): string | undefined {
+  const t = text.trim()
+  if (!t || t.includes("\n")) return undefined
+  const quoted = (q: string) => t.length > 1 && t.startsWith(q) && t.endsWith(q)
+  if (quoted("'") || quoted('"')) return t.slice(1, -1) || undefined
+  const looksAbsolute = /^[~/]/.test(t) || /^[A-Za-z]:[\\/]/.test(t)
+  if (!looksAbsolute) return undefined
+  // A backslash is an escape everywhere but Windows, where it separates directories.
+  return platform === "win32" ? t : t.replace(/\\(.)/g, "$1")
+}
+
 /** `question | a | b` → poll payload, or an error string. */
 export function parsePoll(rest: string): { question: string; options: string[] } | string {
   const parts = rest

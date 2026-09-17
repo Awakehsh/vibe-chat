@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { Message } from "@vibechat/protocol"
 import { Model } from "../src/model.ts"
-import { completions, parseCommand, parsePoll, parseStatus } from "../src/tui/commands.ts"
+import { completions, droppedPath, parseCommand, parsePoll, parseStatus } from "../src/tui/commands.ts"
 import { isMention, pollLines, rollLine } from "../src/tui/format.ts"
 import { bodyChunks, commandLines, dividerLines, editedLines, gapLines, hasBlockMarkdown, headerLines, isGap, messageLines, reactionLines, textOf, unreadLines, unsentLines, wrap } from "../src/tui/scrollback.ts"
 import { colorOf, theme } from "../src/tui/theme.ts"
@@ -204,5 +204,25 @@ describe("pure helpers", () => {
     expect(completions("/ro").map((c) => c.name)).toEqual(["rooms", "room", "roll"])
     expect(parsePoll("dinner? | ramen | pizza")).toEqual({ question: "dinner?", options: ["ramen", "pizza"] })
     expect(parseStatus("vibing 🎧")).toEqual({ text: "vibing", emoji: "🎧" })
+  })
+})
+
+describe("a file dragged into the window", () => {
+  test("is recognised however the terminal quotes it", () => {
+    expect(droppedPath("/Users/hu/Desktop/shot.png", "darwin")).toBe("/Users/hu/Desktop/shot.png")
+    expect(droppedPath("/Users/hu/Desktop/\\u622a\\u5c4f 11.44.03.png".replace("\\u622a\\u5c4f", "截屏"), "darwin")).toBe("/Users/hu/Desktop/截屏 11.44.03.png")
+    expect(droppedPath("/Users/hu/My\\ File.png", "darwin")).toBe("/Users/hu/My File.png")
+    expect(droppedPath("'/Users/hu/My File.png'", "darwin")).toBe("/Users/hu/My File.png")
+    expect(droppedPath('"C:\\Users\\me\\pic.png"', "win32")).toBe("C:\\Users\\me\\pic.png")
+    expect(droppedPath("C:\\Users\\me\\pic.png", "win32")).toBe("C:\\Users\\me\\pic.png")
+    expect(droppedPath("~/Desktop/shot.png", "darwin")).toBe("~/Desktop/shot.png")
+  })
+
+  test("ordinary messages are left alone", () => {
+    expect(droppedPath("hello", "darwin")).toBeUndefined()
+    expect(droppedPath("look at /etc/hosts and tell me", "darwin")).toBeUndefined()
+    expect(droppedPath("", "darwin")).toBeUndefined()
+    expect(droppedPath("/Users/hu/a.png\nand more", "darwin")).toBeUndefined()
+    expect(droppedPath("Windows paths do not escape: C:\\x", "win32")).toBeUndefined()
   })
 })

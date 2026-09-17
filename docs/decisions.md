@@ -218,3 +218,20 @@ The member count also moved into the footer. It was only ever on the divider,
 which is a printed line and therefore a snapshot of the moment the room was
 opened; the number that is supposed to be current now sits where current things
 are shown.
+
+## D22 — A dragged file is sent, not its path (2026-09)
+
+Dragging a file into a terminal types its path into the prompt, so sending a
+picture meant noticing that, deleting it, and typing `/upload` with the same
+path back. The first time anyone tried, the path went out as a message and the
+picture did not.
+
+A message that is nothing but the path of a file that exists is now sent as
+that file. The three ways a terminal writes a dragged path — quoted with
+single or double quotes, or with the spaces backslashed — are all understood,
+and a backslash keeps its meaning as a separator on Windows rather than being
+read as an escape. Text that merely mentions a path is untouched, because the
+whole message has to be the path and the file has to be there.
+
+`/upload` stays: a path you type is still a path you type, and it is the only
+way to send a file whose name would not survive a drag.

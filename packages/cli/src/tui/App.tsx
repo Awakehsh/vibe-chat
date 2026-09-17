@@ -10,7 +10,7 @@ import { configDir } from "../config.ts"
 import { createIdentity, type Identity } from "../identity.ts"
 import { createNotifier } from "../notify.ts"
 import { createChime } from "../sound.ts"
-import { COMMANDS, parseCommand, parsePoll, parseStatus } from "./commands.ts"
+import { COMMANDS, droppedPath, parseCommand, parsePoll, parseStatus } from "./commands.ts"
 import { POLL_DIGITS, clip, humanSize, isMention } from "./format.ts"
 import { MessagePicker } from "./MessagePicker.tsx"
 import { Onboarding } from "./Onboarding.tsx"
@@ -452,6 +452,14 @@ export function App(props: AppProps) {
         const cmd = parseCommand(text)
         if (!cmd) {
           if (!room) return flash("no room selected: /new <name> or /join <host/TOKEN>")
+          // A file dragged into the window arrives as its path; send the file, not the path.
+          const dropped = droppedPath(text)
+          if (dropped && (await Bun.file(dropped.replace(/^~(?=\/)/, process.env.HOME ?? "~")).exists())) {
+            flash("uploading…", 30000)
+            const att = await client.upload(room.room.roomId, dropped.replace(/^~(?=\/)/, process.env.HOME ?? "~"))
+            await sendMessage(client, room.room.roomId, "", { attachments: [att.fileId] })
+            return flash(`sent ${att.name}`)
+          }
           await sendMessage(client, room.room.roomId, text)
           return
         }
@@ -459,7 +467,8 @@ export function App(props: AppProps) {
           case "help":
             return out("/help", [
               ...COMMANDS.map((c) => `/${c.name} ${c.args}`.padEnd(38) + c.description),
-              "Enter send · Shift+Enter newline · Ctrl+K rooms · Esc cancel · Ctrl+C twice quit · scroll with your terminal",
+              "Enter send · Shift+Enter newline · Ctrl+K rooms · Ctrl+L clear · Esc cancel · Ctrl+C twice quit",
+              "drag a file into the window to send it · scroll with your terminal",
             ])
           case "rooms":
             return out(
