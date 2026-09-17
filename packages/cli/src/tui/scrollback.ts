@@ -283,6 +283,18 @@ export function headerLines(version: string, name: string, detail: string): Line
 }
 
 let seq = 0
+let drewKittyImage = false
+
+/** True once an image has been drawn with the kitty protocol, whose placements outlive us. */
+export function drewKittyImages(): boolean {
+  return drewKittyImage
+}
+
+/**
+ * A kitty placement belongs to the terminal, not to the rows it covers, so it
+ * stays painted over the shell after we exit. Nothing else removes it.
+ */
+export const KITTY_DELETE_ALL = "\x1b_Ga=d,d=A\x1b\\"
 
 /** Prints lines into the scrollback above the live region. Returns how many rows were used. */
 export function commit(renderer: CliRenderer, lines: Line[]): number {
@@ -376,6 +388,7 @@ export async function commitImage(renderer: CliRenderer, bytes: Uint8Array, cols
     // The pixels are decoded off the render path; committing before that is done
     // reserves the rows and leaves them empty.
     await image.loadPromise
+    if (image.effectiveProtocol === "kitty") drewKittyImage = true
     surface.render()
     await surface.settle(1500)
     const height = surface.height

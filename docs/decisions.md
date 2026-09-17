@@ -235,3 +235,18 @@ whole message has to be the path and the file has to be there.
 
 `/upload` stays: a path you type is still a path you type, and it is the only
 way to send a file whose name would not survive a drag.
+
+## D23 — A kitty image is removed when we leave (2026-09)
+
+An image drawn with the kitty protocol is a placement the terminal owns, not
+rows of text. It survives our exit: quitting left a picture painted over the
+shell prompt with the transcript gone from under it. Nothing in the library
+removes one, so the delete-all is written ourselves, after the renderer is
+destroyed, and only when an image actually resolved to the kitty protocol —
+`effectiveProtocol` says which one it got, and a terminal that fell back to
+block characters needs nothing.
+
+The cost is that a picture does not survive in scrollback the way the text
+around it does. A placement anchored to its rows would, but that is the
+library's to give, and a ghost floating over the shell is worse than a
+transcript whose pictures are gone once you quit.

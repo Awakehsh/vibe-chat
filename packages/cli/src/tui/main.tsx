@@ -1,5 +1,6 @@
 import { createCliRenderer } from "@opentui/core"
 import { createRoot } from "@opentui/react"
+import { KITTY_DELETE_ALL, drewKittyImages } from "./scrollback.ts"
 import type { ParsedArgs } from "../args.ts"
 import { configDir, loadConfig } from "../config.ts"
 import { loadIdentity } from "../identity.ts"
@@ -69,4 +70,5 @@ export async function chat(args: ParsedArgs, version = "0.1.0"): Promise<void> {
     )
   })
   renderer.destroy()
+  if (drewKittyImages()) process.stdout.write(KITTY_DELETE_ALL)
 }
