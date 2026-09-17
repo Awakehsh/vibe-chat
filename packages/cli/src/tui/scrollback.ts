@@ -25,7 +25,7 @@ import {
 import type { Message, PollMeta, RollMeta } from "@vibechat/protocol"
 import type { Model } from "../model.ts"
 import { CAT_FRAMES } from "./Cat.tsx"
-import { clip, humanSize, pollLines, reactionLine, rollLine } from "./format.ts"
+import { clip, humanSize, isMention, pollLines, reactionLine, rollLine } from "./format.ts"
 import { spriteCells } from "./Sprite.tsx"
 import { colorOf, glyph, theme } from "./theme.ts"
 
@@ -33,6 +33,8 @@ export type Line = TextChunk[]
 
 /** Same author, same kind, within this window: the name is shown once. */
 const RUN_WINDOW_MS = 3 * 60 * 1000
+/** A silence at least this long is where the clock is worth printing. */
+const GAP_MS = 10 * 60 * 1000
 const INDENT = "  "
 
 const plain = (s: string): TextChunk[] => stringToStyledText(s).chunks
@@ -146,6 +148,9 @@ export function messageLines(m: Message, ctx: MessageContext): Line[] {
   const own = m.authorId === selfId
   const name = model.nameOf(m.authorId)
   const who = own ? theme.self : colorOf(m.authorId)
+  // A message that names you takes the accent down its whole left edge, so it
+  // is findable while scrolling and not only where the `@name` itself sits.
+  const rail = !own && isMention(m, selfName) ? theme.accent : who
   const lines: Line[] = []
 
   if (m.kind === "system") return [[col(theme.system, `${glyph.result}  ${m.body}`)]]
@@ -156,7 +161,7 @@ export function messageLines(m: Message, ctx: MessageContext): Line[] {
   }
 
   if (m.deletedAt) {
-    lines.push(own ? [col(theme.dim, `${glyph.self} (deleted)`)] : [col(who, `${glyph.other} `), colb(theme.dim, name), col(theme.dim, ": (deleted)")])
+    lines.push(own ? [col(theme.dim, `${glyph.self} (deleted)`)] : [col(rail, `${glyph.other} `), colb(theme.dim, name), col(theme.dim, ": (deleted)")])
     return lines
   }
 
@@ -164,7 +169,7 @@ export function messageLines(m: Message, ctx: MessageContext): Line[] {
   switch (m.kind) {
     case "me": {
       const w = 3 + displayWidth(name)
-      lines.push(...bodyLines([col(theme.accent, `${glyph.me} `), colb(who, name), plain(" ")[0]!], w, gutter(who, w), m.body + suffix, width, theme.self, selfName))
+      lines.push(...bodyLines([col(theme.accent, `${glyph.me} `), colb(who, name), plain(" ")[0]!], w, gutter(rail, w), m.body + suffix, width, theme.self, selfName))
       break
     }
     case "roll": {
@@ -183,18 +188,18 @@ export function messageLines(m: Message, ctx: MessageContext): Line[] {
     }
     case "sticker": {
       const text = (m.meta as { text?: string } | undefined)?.text ?? m.body
-      lines.push([...authorPrefix(own, name, who), colb(theme.accent, text), col(theme.dim, " (sticker)")])
+      lines.push([...authorPrefix(own, name, who, rail), colb(theme.accent, text), col(theme.dim, " (sticker)")])
       break
     }
     default: {
       const w = 4 + displayWidth(name)
       if (own) lines.push(...bodyLines([col(theme.self, `${glyph.self} `)], 2, gutter(theme.self, 2), m.body + suffix, width, theme.self, selfName))
-      else if (sameRun(ctx.prev, m)) lines.push(...bodyLines(gutter(who, w), w, gutter(who, w), m.body + suffix, width, theme.name, selfName))
-      else lines.push(...bodyLines(authorPrefix(false, name, who), w, gutter(who, w), m.body + suffix, width, theme.name, selfName))
+      else if (sameRun(ctx.prev, m)) lines.push(...bodyLines(gutter(rail, w), w, gutter(rail, w), m.body + suffix, width, theme.name, selfName))
+      else lines.push(...bodyLines(authorPrefix(false, name, who, rail), w, gutter(rail, w), m.body + suffix, width, theme.name, selfName))
     }
   }
 
-  const meta = gutter(who, own ? 2 : 4 + displayWidth(name))
+  const meta = gutter(rail, own ? 2 : 4 + displayWidth(name))
   for (const a of m.attachments) lines.push([...meta, col(theme.dim, `📎 ${a.name} (${humanSize(a.size)})`)])
   if (m.kind !== "poll") {
     const r = reactionLine(m.reactions)
@@ -203,8 +208,8 @@ export function messageLines(m: Message, ctx: MessageContext): Line[] {
   return lines
 }
 
-function authorPrefix(own: boolean, name: string, color: string): Line {
-  return own ? [col(theme.self, `${glyph.self} `)] : [col(color, `${glyph.other} `), colb(color, name), col(theme.dim, ": ")]
+function authorPrefix(own: boolean, name: string, color: string, rail: string): Line {
+  return own ? [col(theme.self, `${glyph.self} `)] : [col(rail, `${glyph.other} `), colb(color, name), col(theme.dim, ": ")]
 }
 
 export function reactionLines(model: Model, target: Message, userId: string, emoji: string, width: number): Line[] {
@@ -214,6 +219,24 @@ export function reactionLines(model: Model, target: Message, userId: string, emo
 export function editedLines(model: Model, m: Message, width: number): Line[] {
   if (m.deletedAt) return [[col(theme.dim, `${INDENT}${glyph.result}  ${model.nameOf(m.authorId)} deleted a message`)]]
   return [[col(theme.dim, `${INDENT}${glyph.result}  ${model.nameOf(m.authorId)} edited: "${clip(m.body, Math.max(10, width - 24))}"`)]]
+}
+
+/** True when enough silence sits between two messages to be worth a clock. */
+export function isGap(prev: Message, m: Message): boolean {
+  return new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() >= GAP_MS
+}
+
+/** The local clock, printed only where the conversation stopped for a while. Always 24-hour: a transcript reads as a log, and the width stays fixed. */
+export function gapLines(at: string, width: number): Line[] {
+  const label = `· ${new Date(at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })} ·`
+  return [[col(theme.dim, " ".repeat(Math.max(0, Math.floor((width - displayWidth(label)) / 2))) + label)]]
+}
+
+/** Where what you had already read ends and what arrived since begins. */
+export function unreadLines(count: number, width: number): Line[] {
+  const label = ` ${count} new ${count === 1 ? "message" : "messages"} `
+  const rule = "─".repeat(Math.max(0, width - displayWidth(label) - 2))
+  return [[col(theme.accent, `──${label}${rule}`)]]
 }
 
 export function dividerLines(title: string, detail: string, width: number): Line[] {

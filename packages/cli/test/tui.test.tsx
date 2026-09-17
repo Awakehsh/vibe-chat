@@ -3,8 +3,8 @@ import type { Message } from "@vibechat/protocol"
 import { Model } from "../src/model.ts"
 import { completions, parseCommand, parsePoll, parseStatus } from "../src/tui/commands.ts"
 import { isMention, pollLines, rollLine } from "../src/tui/format.ts"
-import { bodyChunks, commandLines, dividerLines, editedLines, hasBlockMarkdown, headerLines, messageLines, reactionLines, textOf, wrap } from "../src/tui/scrollback.ts"
-import { colorOf } from "../src/tui/theme.ts"
+import { bodyChunks, commandLines, dividerLines, editedLines, gapLines, hasBlockMarkdown, headerLines, isGap, messageLines, reactionLines, textOf, unreadLines, wrap } from "../src/tui/scrollback.ts"
+import { colorOf, theme } from "../src/tui/theme.ts"
 import { autoStatusText } from "../src/autostatus.ts"
 
 const me = "M".repeat(43)
@@ -32,6 +32,13 @@ const msg = (over: Partial<Message>): Message => ({
 
 const lines = (m: Message, prev?: Message, width = 60) => messageLines(m, { model: model(), selfId: me, selfName: "小鹿", width, prev }).map(textOf)
 
+/** The colour of the rail: the `⏺` or `┊` in the first column of a message. */
+const rail = (m: Message, prev?: Message): string => {
+  const chunk = messageLines(m, { model: model(), selfId: me, selfName: "小鹿", width: 60, prev })[0]![0]!
+  const b = (chunk.fg as unknown as { buffer: Record<number, number> }).buffer
+  return `#${[0, 1, 2].map((i) => b[i]!.toString(16).padStart(2, "0")).join("")}`
+}
+
 describe("mentions", () => {
   test("a CJK name is closed by the token charset, not an ASCII word boundary", () => {
     expect(isMention(msg({ body: "@小鹿 在吗" }), "小鹿")).toBe(true)
@@ -39,6 +46,31 @@ describe("mentions", () => {
     expect(isMention(msg({ body: "@小鹿鹿 在吗" }), "小鹿")).toBe(false)
     expect(isMention(msg({ body: "hey @bob" }), "bob")).toBe(true)
     expect(isMention(msg({ body: "hey @bobby" }), "bob")).toBe(false)
+  })
+
+  test("naming you puts the accent down the whole left edge", () => {
+    expect(rail(msg({ body: "@小鹿 看一下" }))).toBe(theme.accent)
+    expect(rail(msg({ body: "看一下" }))).toBe(colorOf(bob))
+    expect(rail(msg({ authorId: me, body: "@小鹿 自言自语" }))).toBe(theme.self)
+  })
+})
+
+describe("time gaps and the unread mark", () => {
+  test("a gap is ten minutes of silence, not three", () => {
+    const first = msg({})
+    expect(isGap(first, msg({ createdAt: "2026-09-16T10:04:00.000Z" }))).toBe(false)
+    expect(isGap(first, msg({ createdAt: "2026-09-16T10:11:00.000Z" }))).toBe(true)
+  })
+
+  test("the clock is centred and the unread rule fills the width", () => {
+    const gap = gapLines("2026-09-16T10:00:00.000Z", 40).map(textOf)[0]!
+    expect(gap.trim()).toMatch(/^· \d{2}:\d{2} ·$/)
+    expect(Bun.stringWidth(gap)).toBeLessThanOrEqual(40)
+    expect(gap.startsWith(" ".repeat(10))).toBe(true)
+    const one = unreadLines(1, 40).map(textOf)[0]!
+    expect(one.startsWith("── 1 new message ─")).toBe(true)
+    expect(Bun.stringWidth(one)).toBe(40)
+    expect(unreadLines(5, 40).map(textOf)[0]!.startsWith("── 5 new messages ─")).toBe(true)
   })
 })
 

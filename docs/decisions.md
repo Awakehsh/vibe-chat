@@ -120,3 +120,22 @@ people who picked the same name, so it is a weak identity signal rather than
 decoration. It is a second channel, never the only one: the name is still
 printed at the head of every run, so the transcript reads the same without
 colour. This does not reopen D7 — there is still one palette and no themes.
+
+## D16 — Three marks between messages, none of them a timestamp (2026-09)
+
+D12 rules out per-message timestamps, but a transcript with no clock at all
+loses two things: where the conversation stopped, and where you stopped
+reading. Both are printed as a line of their own, so a message never pays for
+them.
+
+A silence of ten minutes or more prints the local clock, centred and dim, in
+24-hour form: the transcript reads as a log, and the width stays fixed. The
+read watermark prints an accent rule naming how many messages arrived since,
+and it restarts the run, so the first message under it shows its author
+again. A boundary on the very first replayed line prints nothing, because the
+room divider already sits above it.
+
+The third mark is on the message itself: one that names you takes the accent
+down its whole left edge — the `⏺` and every `┊` under it — while the name
+keeps the author's own colour from D15. The highlight on the `@name` alone
+was invisible while scrolling; a coloured edge is not.

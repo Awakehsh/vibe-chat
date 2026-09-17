@@ -23,10 +23,13 @@ import {
   commitSticker,
   dividerLines,
   editedLines,
+  gapLines,
   hasBlockMarkdown,
   headerLines,
+  isGap,
   messageLines,
   reactionLines,
+  unreadLines,
   type Line,
 } from "./scrollback.ts"
 import { StatusLine } from "./StatusLine.tsx"
@@ -141,7 +144,9 @@ export function App(props: AppProps) {
   const printMessage = useCallback(
     (c: Client, m: Message) => {
       const w = width()
-      const ctx = { model: c.model, selfId: c.identity.publicKey, selfName: c.identity.name, width: w, prev: lastPrinted.current.get(m.roomId) }
+      const prev = lastPrinted.current.get(m.roomId)
+      if (prev && isGap(prev, m)) print(gapLines(m.createdAt, w))
+      const ctx = { model: c.model, selfId: c.identity.publicKey, selfName: c.identity.name, width: w, prev }
       const block = m.kind === "text" && !m.deletedAt && hasBlockMarkdown(m.body)
       if (block) {
         // Author line first, then the body as a rendered markdown block.
@@ -179,8 +184,18 @@ export function App(props: AppProps) {
       const fresh = r.messages.filter((m) => m.seq > since)
       const tail = since === 0 ? fresh.slice(-REPLAY_COUNT) : fresh
       if (tail.length < fresh.length) print(commandLines("", [`… ${fresh.length - tail.length} earlier messages not shown · /history prints them`], width()).slice(1))
+      // Where the read watermark falls inside the replay, mark it. A boundary on
+      // the first line needs no rule: the room divider is already above it.
+      const readSeq = r.members.get(c.identity.publicKey)?.lastReadSeq ?? 0
+      const firstUnread = tail.findIndex((m) => m.seq > readSeq && m.authorId !== c.identity.publicKey)
       lastPrinted.current.delete(roomId)
-      for (const m of tail) printMessage(c, m)
+      tail.forEach((m, i) => {
+        if (i === firstUnread && i > 0) {
+          print(unreadLines(tail.slice(i).filter((x) => x.authorId !== c.identity.publicKey).length, width()))
+          lastPrinted.current.delete(roomId)
+        }
+        printMessage(c, m)
+      })
       c.markRead(roomId)
     },
     [print, printMessage, width],
