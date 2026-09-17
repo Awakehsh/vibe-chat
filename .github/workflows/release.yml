@@ -69,3 +69,27 @@ jobs:
             dist/vibechat.json
           generate_release_notes: true
 
+      # The tap and the bucket live in their own repositories, so this needs a
+      # token that can write to them; without the secret the release still
+      # publishes and the two files are updated by hand from its assets.
+      - name: Publish the Homebrew formula and the Scoop manifest
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          VERSION: ${{ github.ref_name }}
+        if: ${{ env.TAP_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          publish() {
+            repo=$1 path=$2 src=$3 dir=$(mktemp -d)
+            git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/${OWNER}/${repo}.git" "$dir"
+            install -D "$src" "$dir/$path"
+            git -C "$dir" add "$path"
+            git -C "$dir" diff --cached --quiet && { echo "$repo already at ${VERSION#v}"; return; }
+            git -C "$dir" -c user.name="github-actions[bot]" \
+                          -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                          commit -m "vibechat ${VERSION#v}"
+            git -C "$dir" push
+          }
+          publish homebrew-tap Formula/vibechat.rb dist/vibechat.rb
+          publish scoop-bucket bucket/vibechat.json dist/vibechat.json
