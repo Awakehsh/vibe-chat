@@ -2,7 +2,7 @@
 import { RequestError } from "./connection.ts"
 import { UsageError, parseArgs } from "./args.ts"
 
-const VERSION = "0.1.2"
+const VERSION = "0.2.0"
 
 const HELP = `vibechat ${VERSION} — terminal chat that looks like work
 
