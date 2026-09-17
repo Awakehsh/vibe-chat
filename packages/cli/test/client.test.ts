@@ -42,6 +42,61 @@ describe("identity files", () => {
   })
 })
 
+describe("membership", () => {
+  test("someone already in the room sees the next one arrive", async () => {
+    const a = await client("owner")
+    const b = await client("newcomer")
+    const room = await a.createRoom(host, "crew")
+    expect(a.model.room(room.roomId)!.members.size).toBe(1)
+    const grew = new Promise<number>((resolve) => {
+      const off = a.model.on(() => {
+        const n = a.model.room(room.roomId)!.members.size
+        if (n === 2) {
+          off()
+          resolve(n)
+        }
+      })
+    })
+    await b.joinRoom(host, room.invite!)
+    expect(await grew).toBe(2)
+    expect([...a.model.room(room.roomId)!.members.keys()].map((id) => a.model.nameOf(id)).sort()).toEqual(["newcomer", "owner"])
+    a.close()
+    b.close()
+  })
+})
+
+describe("membership after a fresh sync", () => {
+  test("a client that learned the room from sync still sees the next member arrive", async () => {
+    const cfg = join(dir, "reconnector")
+    const identity = await createIdentity("reconnector", undefined, cfg)
+    const first = new Client({ identity, config: await loadConfig(cfg), configDir: cfg })
+    const room = await first.createRoom(host, "crew2")
+    first.close()
+
+    // A second process with the same identity: the room comes from sync.
+    const a = new Client({ identity, config: await loadConfig(cfg), configDir: cfg })
+    await a.connectAll()
+    await Bun.sleep(300)
+    expect(a.model.room(room.roomId)!.members.size).toBe(1)
+
+    const b = await client("latecomer")
+    const grew = new Promise<number>((resolve) => {
+      const off = a.model.on(() => {
+        const n = a.model.room(room.roomId)?.members.size ?? 0
+        if (n === 2) {
+          off()
+          resolve(n)
+        }
+      })
+      setTimeout(() => resolve(a.model.room(room.roomId)?.members.size ?? 0), 2000)
+    })
+    await b.joinRoom(host, room.invite!)
+    expect(await grew).toBe(2)
+    a.close()
+    b.close()
+  })
+})
+
 describe("a server that is not there", () => {
   test("is one line naming the host, not a stack trace", async () => {
     const c = await client("nowhere")

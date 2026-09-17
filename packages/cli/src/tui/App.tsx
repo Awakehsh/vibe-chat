@@ -358,6 +358,13 @@ export function App(props: AppProps) {
     }
   }, [client, activeRoomId, tick, replayRoom])
 
+  // React state changing does not by itself make the renderer draw a frame, so a
+  // message or a member arriving left the footer showing the counts it had at the
+  // last keystroke. Ask for one after every render.
+  useEffect(() => {
+    renderer.requestRender()
+  })
+
   const model = client?.model
   const room = model && activeRoomId ? model.room(activeRoomId) : undefined
   const typing = room && model ? model.typingIn(room.room.roomId) : []
@@ -754,7 +761,7 @@ export function App(props: AppProps) {
   const myLast = room ? [...room.messages].reverse().find((m) => m.authorId === identity.publicKey && m.seq > 0) : undefined
   const seenBy = myLast && room ? [...room.members.values()].filter((mb) => mb.userId !== identity.publicKey && mb.lastReadSeq >= myLast.seq).length : 0
   const where = room
-    ? [`#${title}`, `${online} online`, myLast && room.members.size > 1 ? `seen by ${seenBy}/${room.members.size - 1}` : "", unreadElsewhere ? `${unreadElsewhere} unread elsewhere` : "", offline.length ? `reconnecting ${offline.join(", ")}` : ""].filter(Boolean).join(" · ")
+    ? [`#${title}`, `${room.members.size} members`, `${online} online`, myLast && room.members.size > 1 ? `seen by ${seenBy}/${room.members.size - 1}` : "", unreadElsewhere ? `${unreadElsewhere} unread elsewhere` : "", offline.length ? `reconnecting ${offline.join(", ")}` : ""].filter(Boolean).join(" · ")
     : client
       ? "no room · /server <host> · /new <name> · /join <host/TOKEN>"
       : "connecting…"

@@ -199,3 +199,22 @@ them leaves that record lying. The command names the right one instead.
 
 Nothing runs on a timer and nothing phones home while you chat. Hearing about
 a new version is a separate question, still unanswered.
+
+## D21 — The live region is repainted after every render (2026-09)
+
+The footer is the only part of the screen that can change after it is drawn, so
+it is where anything live has to live. It was not being drawn: a model event
+updated React state, React re-rendered the tree, and the renderer drew nothing
+until the next keystroke. A message arriving repainted the transcript, because
+that goes straight into scrollback, but the counts beside the room name kept
+whatever they had at the last key press — a room could say one member for
+minutes after the second one arrived and said hello.
+
+An effect with no dependency list now asks the renderer for a frame after every
+render. It draws at most one frame per state change and nothing calls back into
+React, so there is no loop.
+
+The member count also moved into the footer. It was only ever on the divider,
+which is a printed line and therefore a snapshot of the moment the room was
+opened; the number that is supposed to be current now sits where current things
+are shown.
