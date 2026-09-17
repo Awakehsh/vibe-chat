@@ -153,3 +153,15 @@ else's.
 doubles as an author. Your name stays in the quiet grey while other people
 keep the colour from D15, so the asymmetry that matters — what you already
 know you said, against what someone else just said — survives.
+
+## D18 — A failed send is appended, never taken back (2026-09)
+
+D11 makes a printed line permanent, so the optimistic copy of a message that
+the server then refuses cannot be unprinted. Removing it from the model, which
+is what used to happen, left the line on screen looking sent. The failure is
+now printed under it instead, and what never got through is kept in order
+until `/retry` drains it, so nothing typed while the link was down is lost.
+
+This is the shape every later change of a message already had — a reaction, an
+edit, a deletion all print as new lines — and it is why there is no pending or
+sending state: a mark that has to be revised cannot exist here.
