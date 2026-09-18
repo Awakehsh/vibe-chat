@@ -28,15 +28,27 @@ async function latestTag(): Promise<string> {
   return tag
 }
 
-/** `vibechat update` replaces this binary with the latest release built for this machine. */
-export async function update(args: ParsedArgs, version: string): Promise<void> {
+/** Thrown when this binary belongs to a package manager, which should be the one to replace it. */
+export class ManagedInstall extends Error {
+  constructor(
+    readonly path: string,
+    readonly command: string,
+  ) {
+    super(`${path} was installed by a package manager; update it with:\n\n  ${command}\n`)
+  }
+}
+
+/**
+ * Replaces this binary with the latest release built for this machine. Returns
+ * the tag it installed, or undefined when there was nothing newer.
+ */
+export async function installLatest(version: string): Promise<string | undefined> {
   const exe = await realpath(process.execPath)
   const owner = ownedBy(exe)
-  if (owner) throw new UsageError(`${exe} was installed by a package manager; update it with:\n\n  ${owner}\n`)
+  if (owner) throw new ManagedInstall(exe, owner)
 
   const tag = await latestTag()
-  if (tag === `v${version}`) return console.log(`already on ${tag}`)
-  console.log(`${version} -> ${tag.replace(/^v/, "")}`)
+  if (tag === `v${version}`) return undefined
 
   const url = `https://github.com/${REPO}/releases/download/${tag}/${assetName()}`
   const res = await fetch(url)
@@ -53,9 +65,21 @@ export async function update(args: ParsedArgs, version: string): Promise<void> {
     await unlink(old).catch(() => undefined)
     await rename(exe, old)
     await rename(tmp, exe)
-    console.log(`updated ${exe}\nthe copy you are running is now ${old}; it can be deleted once you close this window`)
-    return
+    return tag
   }
   await rename(tmp, exe)
-  console.log(`updated ${exe}`)
+  return tag
+}
+
+/** `vibechat update` replaces this binary with the latest release built for this machine. */
+export async function update(args: ParsedArgs, version: string): Promise<void> {
+  try {
+    const tag = await installLatest(version)
+    if (!tag) return console.log(`already on v${version}`)
+    console.log(`${version} -> ${tag.replace(/^v/, "")}`)
+    console.log(process.platform === "win32" ? "updated; the copy you are running was renamed aside and can be deleted once you close this window" : "updated; restart vibechat to use it")
+  } catch (e) {
+    if (e instanceof ManagedInstall) throw new UsageError(e.message)
+    throw e
+  }
 }

@@ -36,6 +36,7 @@ export const COMMANDS: SlashCommand[] = [
   { name: "rename", args: "<name>", description: "owner: rename this room" },
   { name: "destroy", args: "", description: "owner: delete this room for everyone" },
   { name: "leave", args: "", description: "leave this room" },
+  { name: "update", args: "[on|off]", description: "automatic updates: show or set" },
   { name: "clear", args: "", description: "clear the screen (also Ctrl+L)" },
   { name: "quit", args: "", description: "exit (also Ctrl+C twice)" },
 ]

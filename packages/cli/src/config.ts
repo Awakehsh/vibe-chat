@@ -15,9 +15,13 @@ export interface Config {
   sounds: boolean
   /** Set your status automatically while an AI coding CLI is running on this machine. */
   autoStatus: boolean
+  /** Fetch a new release in the background when one exists. */
+  autoUpdate: boolean
+  /** When the release list was last asked, so it is asked at most daily. */
+  lastUpdateCheck?: string
 }
 
-const DEFAULT_CONFIG: Config = { hosts: [], notifications: true, sounds: true, autoStatus: false }
+const DEFAULT_CONFIG: Config = { hosts: [], notifications: true, sounds: true, autoStatus: false, autoUpdate: true }
 
 export function configDir(env: NodeJS.ProcessEnv = process.env): string {
   if (env.VIBECHAT_HOME) return env.VIBECHAT_HOME

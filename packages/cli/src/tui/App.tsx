@@ -10,6 +10,7 @@ import { configDir } from "../config.ts"
 import { createIdentity, type Identity } from "../identity.ts"
 import { createNotifier } from "../notify.ts"
 import { createChime } from "../sound.ts"
+import { ManagedInstall, installLatest } from "../commands/update.ts"
 import { COMMANDS, droppedPath, parseCommand, parsePoll, parseStatus } from "./commands.ts"
 import { POLL_DIGITS, clip, humanSize, isMention } from "./format.ts"
 import { MessagePicker } from "./MessagePicker.tsx"
@@ -50,6 +51,7 @@ export interface AppProps {
 /** How many messages a room switch replays when nothing from it was printed yet. */
 const REPLAY_COUNT = 30
 const PICK_COUNT = 12
+const UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 const IMAGE_COLS = 48
 const IMAGE_ROWS = 14
 
@@ -332,6 +334,29 @@ export function App(props: AppProps) {
     },
     [client, chime],
   )
+
+  // Fetch a new release in the background, at most once a day. The running copy is
+  // untouched; the replacement is what starts next time. A binary a package manager
+  // owns is left alone, and a failure is silent — this is not what you came here for.
+  useEffect(() => {
+    if (!client || !client.config.autoUpdate) return
+    const last = client.config.lastUpdateCheck ? Date.parse(client.config.lastUpdateCheck) : 0
+    if (Date.now() - last < UPDATE_EVERY_MS) return
+    let cancelled = false
+    void (async () => {
+      client.config.lastUpdateCheck = new Date().toISOString()
+      await saveConfig(client.config, configDir()).catch(() => undefined)
+      try {
+        const tag = await installLatest(props.version)
+        if (tag && !cancelled) print(commandLines("", [`updated to ${tag} · restart vibechat to use it`], width()).slice(1))
+      } catch (e) {
+        if (e instanceof ManagedInstall) return
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [client, props.version, print, width])
 
   // Auto status: follow AI coding CLIs running on this machine.
   useEffect(() => {
@@ -700,6 +725,13 @@ export function App(props: AppProps) {
             unsent.current = []
             for (const u of pending) await sendMessage(client, u.roomId, u.body, u.opts)
             return
+          }
+          case "update": {
+            const want = cmd.rest.trim().toLowerCase()
+            if (want !== "on" && want !== "off") return out("/update", [`automatic updates are ${client.config.autoUpdate ? "on" : "off"}`, "/update on · /update off"])
+            client.config.autoUpdate = want === "on"
+            await saveConfig(client.config, configDir())
+            return flash(`automatic updates ${want}`)
           }
           case "clear":
             return clearScreen()

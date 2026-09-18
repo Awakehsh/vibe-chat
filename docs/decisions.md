@@ -250,3 +250,25 @@ The cost is that a picture does not survive in scrollback the way the text
 around it does. A placement anchored to its rows would, but that is the
 library's to give, and a ghost floating over the shell is worse than a
 transcript whose pictures are gone once you quit.
+
+## D24 — Updates arrive on their own, and can be told not to (2026-09)
+
+D20 said updating was a command and nothing phoned home. Eleven releases in a
+day made that untenable: everyone was on a different version, each one fixed
+something the others still had, and telling people to run a command does not
+reach the person who does not read the message.
+
+Once a day, after the client is up, the release list is asked and a newer
+build for this machine is fetched and put in place. The running copy is never
+touched — the replacement is what starts next time — so an update can never
+interrupt a conversation, and the transcript gets one line saying it happened.
+A failure is silent: the release list being unreachable is not the user's
+problem to solve mid-sentence.
+
+A binary a package manager owns is left alone, as `vibechat update` already
+did. `/update off` stops it, and the day between checks is recorded in the
+config rather than measured from start-up, so opening the client repeatedly
+does not mean asking repeatedly.
+
+This does reverse D20's last line. The thing being traded is one request a day
+to the release list, against a fleet that never converges.
