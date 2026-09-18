@@ -315,3 +315,20 @@ only the address dialled changes, so their own client stops leaving the
 machine to reach a server on it. It is set explicitly rather than guessed —
 an address that silently falls back to another is a fault that reproduces
 only sometimes.
+
+## D27 — Emoji are typed, not picked from a grid (2026-09)
+
+Sending one meant knowing it by heart or pasting it, which is the one thing a
+terminal is bad at. A separate picker would have been a second way to navigate
+a list, on top of the one above the prompt that already answers ↑↓, Tab, Enter
+and Esc.
+
+So `:name` opens the same menu the slash commands use. The rows differ in what
+Enter does: a command with no arguments runs, an emoji is only filled in,
+because you are in the middle of a sentence. Choosing one replaces the `:name`
+being typed and leaves the rest of the message alone.
+
+The list is about ninety hand-picked ones with aliases, not all of Unicode.
+A menu you scroll past is not a menu, and the names people reach for — `:+1:`,
+`:thanks:`, `:lol:` — matter more than coverage. A colon only starts one at a
+word boundary, so `10:30` and `https://` are still text.

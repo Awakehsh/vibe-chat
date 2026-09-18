@@ -533,7 +533,7 @@ export function App(props: AppProps) {
             return out("/help", [
               ...COMMANDS.map((c) => `/${c.name} ${c.args}`.padEnd(38) + c.description),
               "Enter send · Shift+Enter newline · Ctrl+K rooms · Ctrl+N next unread · Ctrl+L clear · Esc cancel · Ctrl+C twice quit",
-              "drag a file into the window to send it · scroll with your terminal",
+              "drag a file into the window to send it · type :name for emoji · scroll with your terminal",
             ])
           case "rooms":
             return out(

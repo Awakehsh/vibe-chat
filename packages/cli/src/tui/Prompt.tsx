@@ -1,6 +1,6 @@
 import type { KeyEvent, TextareaRenderable } from "@opentui/core"
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
-import { COMMANDS, completions, type SlashCommand } from "./commands.ts"
+import { COMMANDS, menuFor, type MenuItem } from "./commands.ts"
 import { glyph, theme } from "./theme.ts"
 
 export interface PromptHandle {
@@ -40,7 +40,7 @@ export const Prompt = forwardRef<
   const [selected, setSelected] = useState(0)
   const history = useRef<string[]>([])
   const histPos = useRef<number | null>(null)
-  const menu = completions(draft)
+  const menu = menuFor(draft)
   const sel = Math.min(selected, Math.max(0, menu.length - 1))
 
   const setText = (text: string) => {
@@ -57,8 +57,8 @@ export const Prompt = forwardRef<
     onMode?.(mode)
   }
 
-  const complete = (cmd: SlashCommand) => {
-    setText(cmd.args ? `/${cmd.name} ` : `/${cmd.name}`)
+  const choose = (item: MenuItem) => {
+    setText(item.next)
     setSelected(0)
   }
 
@@ -88,19 +88,19 @@ export const Prompt = forwardRef<
       }
       if (key.name === "tab") {
         key.preventDefault()
-        complete(menu[sel]!)
+        choose(menu[sel]!)
         return
       }
       if (key.name === "return" && !key.shift) {
-        const cmd = menu[sel]!
-        if (cmd.args) {
+        const item = menu[sel]!
+        if (!item.ready) {
           key.preventDefault()
-          complete(cmd)
+          choose(item)
           return
         }
-        if (draft !== `/${cmd.name}`) {
+        if (draft !== item.next) {
           key.preventDefault()
-          setText(`/${cmd.name}`)
+          setText(item.next)
           submit()
         }
         return
@@ -145,14 +145,13 @@ export const Prompt = forwardRef<
     <box flexDirection="column" flexShrink={0}>
       {visible.length > 0 ? (
         <box flexDirection="column" paddingLeft={1} flexShrink={0}>
-          {visible.map((c, i) => {
+          {visible.map((item, i) => {
             const isSel = start + i === sel
-            const label = `/${c.name} ${c.args}`.trimEnd().padEnd(NAME_COL)
             return (
-              <text key={c.name} bg={isSel ? theme.menuBg : "transparent"}>
+              <text key={item.key} bg={isSel ? theme.menuBg : "transparent"}>
                 <span fg={isSel ? theme.accent : theme.dim}>{isSel ? "▶ " : "  "}</span>
-                <span fg={isSel ? theme.menuSelected : theme.accent}>{label}</span>
-                <span fg={isSel ? theme.self : theme.dim}>{c.description}</span>
+                <span fg={isSel ? theme.menuSelected : theme.accent}>{item.label.padEnd(NAME_COL)}</span>
+                <span fg={isSel ? theme.self : theme.dim}>{item.hint}</span>
               </text>
             )
           })}

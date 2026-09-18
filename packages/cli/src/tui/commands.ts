@@ -1,3 +1,5 @@
+import { emojiMatches, typedShortcode } from "./emoji.ts"
+
 export interface SlashCommand {
   name: string
   args: string
@@ -44,6 +46,43 @@ export const COMMANDS: SlashCommand[] = [
   { name: "clear", args: "", description: "clear the screen (also Ctrl+L)" },
   { name: "quit", args: "", description: "exit (also Ctrl+C twice)" },
 ]
+
+const EMOJI_MENU_MAX = 30
+
+/** A row of the menu above the prompt, whichever kind of menu it is. */
+export interface MenuItem {
+  key: string
+  label: string
+  hint: string
+  /** The draft after choosing this row. */
+  next: string
+  /** Enter sends it; otherwise Enter only fills it in. */
+  ready: boolean
+}
+
+/** Slash commands while the draft is one, emoji while a `:name` is being typed. */
+export function menuFor(draft: string): MenuItem[] {
+  const cmds = completions(draft)
+  if (cmds.length > 0)
+    return cmds.map((c) => ({
+      key: `/${c.name}`,
+      label: `/${c.name} ${c.args}`.trimEnd(),
+      hint: c.description,
+      next: c.args ? `/${c.name} ` : `/${c.name}`,
+      ready: !c.args,
+    }))
+  const typed = typedShortcode(draft)
+  if (typed === undefined) return []
+  return emojiMatches(typed)
+    .slice(0, EMOJI_MENU_MAX)
+    .map((e) => ({
+      key: `${e.char}:${e.name}`,
+      label: `${e.char}  :${e.name}:`,
+      hint: e.also?.length ? e.also.map((a) => `:${a}:`).join(" ") : "",
+      next: draft.replace(/:[a-z0-9_+-]*$/i, e.char),
+      ready: false,
+    }))
+}
 
 export interface ParsedCommand {
   name: string

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import type { Message } from "@vibechat/protocol"
 import { Model } from "../src/model.ts"
-import { completions, droppedPath, parseCommand, parsePoll, parseStatus } from "../src/tui/commands.ts"
+import { completions, droppedPath, menuFor, parseCommand, parsePoll, parseStatus } from "../src/tui/commands.ts"
+import { emojiMatches, typedShortcode } from "../src/tui/emoji.ts"
 import { isMention, pollLines, rollLine } from "../src/tui/format.ts"
 import { bodyChunks, commandLines, dividerLines, editedLines, gapLines, hasBlockMarkdown, headerLines, isGap, messageLines, reactionLines, textOf, unreadLines, unsentLines, wrap } from "../src/tui/scrollback.ts"
 import { colorOf, theme } from "../src/tui/theme.ts"
@@ -224,5 +225,39 @@ describe("a file dragged into the window", () => {
     expect(droppedPath("", "darwin")).toBeUndefined()
     expect(droppedPath("/Users/hu/a.png\nand more", "darwin")).toBeUndefined()
     expect(droppedPath("Windows paths do not escape: C:\\x", "win32")).toBeUndefined()
+  })
+})
+
+describe("emoji by name", () => {
+  test("a colon at a word boundary starts one, and a time or a URL does not", () => {
+    expect(typedShortcode(":fi")).toBe("fi")
+    expect(typedShortcode("nice :fi")).toBe("fi")
+    expect(typedShortcode(":")).toBe("")
+    expect(typedShortcode("see you at 10:30")).toBeUndefined()
+    expect(typedShortcode("https://x")).toBeUndefined()
+    expect(typedShortcode(":fire ")).toBeUndefined()
+    expect(typedShortcode("plain text")).toBeUndefined()
+  })
+
+  test("names and aliases both find it, best first", () => {
+    expect(emojiMatches("fire")[0]!.char).toBe("🔥")
+    expect(emojiMatches("+1")[0]!.char).toBe("👍")
+    expect(emojiMatches("thanks")[0]!.char).toBe("🙏")
+    expect(emojiMatches("lol")[0]!.char).toBe("😂")
+    expect(emojiMatches("zzzzz")).toHaveLength(0)
+  })
+
+  test("choosing one replaces the word being typed, not the message", () => {
+    const menu = menuFor("ship it :fi")
+    expect(menu[0]!.label).toContain("🔥")
+    expect(menu[0]!.next).toBe("ship it 🔥")
+    expect(menu[0]!.ready).toBe(false)
+  })
+
+  test("a slash command still wins while one is being typed", () => {
+    const menu = menuFor("/he")
+    expect(menu[0]!.label.startsWith("/help")).toBe(true)
+    expect(menu[0]!.ready).toBe(true)
+    expect(menu[0]!.next).toBe("/help")
   })
 })
