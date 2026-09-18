@@ -75,11 +75,11 @@ describe("time gaps and the unread mark", () => {
 })
 
 describe("a message the server never took", () => {
-  test("is reported under the line, with the way to send it again", () => {
-    const line = unsentLines("ok 我明天看", 60).map(textOf)[0]!
-    expect(line).toBe('  ⎿  not sent: "ok 我明天看" · /retry')
-    expect(unsentLines("", 60).map(textOf)[0]!).toContain("(attachment)")
-    expect(Bun.stringWidth(unsentLines("x".repeat(200), 60).map(textOf)[0]!)).toBeLessThanOrEqual(60)
+  test("is reported under the line, and says why", () => {
+    expect(unsentLines("ok 我明天看", 60, "offline").map(textOf)[0]!).toBe('  ⎿  not sent (offline): "ok 我明天看"')
+    expect(unsentLines("", 60, "offline").map(textOf)[0]!).toContain("(attachment)")
+    expect(Bun.stringWidth(unsentLines("x".repeat(200), 60, "offline").map(textOf)[0]!)).toBeLessThanOrEqual(60)
+    expect(Bun.stringWidth(unsentLines("x".repeat(200), 60, "a".repeat(40)).map(textOf)[0]!)).toBeLessThanOrEqual(60)
   })
 })
 

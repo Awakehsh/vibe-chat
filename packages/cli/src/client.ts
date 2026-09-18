@@ -62,8 +62,10 @@ export class Client {
         else existing.on("synced", resolve)
       })
     }
-    const opts: { insecure?: boolean } = {}
+    const opts: { insecure?: boolean; via?: string } = {}
     if (this.opts.insecure) opts.insecure = true
+    const via = this.config.hostAliases?.[host]
+    if (via) opts.via = via
     const conn = new Connection(host, this.opts.identity, opts)
     this.connections.set(host, conn)
     conn.on("synced", (sync) => this.model.applySync(host, sync))

@@ -23,6 +23,8 @@ export interface Config {
   mutedRooms: string[]
   /** User ids whose messages are not shown. */
   blocked: string[]
+  /** Where to dial a host, when it is not where its name points. */
+  hostAliases?: Record<string, string>
 }
 
 const DEFAULT_CONFIG: Config = { hosts: [], notifications: true, sounds: true, autoStatus: false, autoUpdate: true, mutedRooms: [], blocked: [] }

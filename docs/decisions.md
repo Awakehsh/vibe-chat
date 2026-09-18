@@ -295,3 +295,23 @@ something waiting, the same order the room list uses.
 
 Blocking is not a moderation tool. The owner's `/kick` is; this only changes
 what you see, and the person on the other end is not told.
+
+## D26 — A link that comes back sends what was waiting (2026-09)
+
+Switching networks took the relay's public name down for minutes while the
+tunnel re-registered, and four messages typed in that window reported `not
+sent` with no reason and sat there until someone typed `/retry`. The tunnel's
+recovery is not ours to shorten; losing the messages in the meantime was.
+
+What is queued is what is worth trying again: a link that is down comes back,
+so a connection failure is kept, while a server that refused is reported and
+dropped — it will refuse the same message again. The line now says which of
+the two it was. When a server reports itself online the queue empties itself,
+in the order it was typed, and says so once.
+
+`/server local [port]` is the other half, for the person whose own machine
+runs the relay: the room stays filed under the name everyone else uses, and
+only the address dialled changes, so their own client stops leaving the
+machine to reach a server on it. It is set explicitly rather than guessed —
+an address that silently falls back to another is a fault that reproduces
+only sometimes.

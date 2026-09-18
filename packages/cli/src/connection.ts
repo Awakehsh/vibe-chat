@@ -69,9 +69,10 @@ export class Connection {
   constructor(
     readonly host: string,
     private readonly identity: Identity,
-    opts: { insecure?: boolean } = {},
+    opts: { insecure?: boolean; via?: string } = {},
   ) {
-    this.url = socketUrlForHost(host, opts)
+    // `host` stays the name rooms are filed under; `via` is only where to dial it.
+    this.url = socketUrlForHost(opts.via ?? host, opts)
   }
 
   on<K extends keyof ConnectionEvents>(name: K, fn: ConnectionEvents[K]): () => void {

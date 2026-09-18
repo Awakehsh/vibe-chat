@@ -8,7 +8,7 @@ export const COMMANDS: SlashCommand[] = [
   { name: "help", args: "", description: "list commands and keys" },
   { name: "rooms", args: "", description: "list your rooms" },
   { name: "room", args: "<name>", description: "switch to a room (also Ctrl+K)" },
-  { name: "server", args: "[host[:port]]", description: "show or set the default server for /new" },
+  { name: "server", args: "[host[:port]|local [port]]", description: "show or set the default server; local reaches one on this machine" },
   { name: "new", args: "<name>", description: "create a group on your default server" },
   { name: "join", args: "<host/TOKEN>", description: "join a group" },
   { name: "invite", args: "[reset]", description: "show this room's invite code, or replace it" },

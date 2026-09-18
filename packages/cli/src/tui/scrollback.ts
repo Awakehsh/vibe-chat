@@ -225,8 +225,14 @@ export function editedLines(model: Model, m: Message, width: number): Line[] {
 }
 
 /** A message the server never took. The line above was already printed and cannot be taken back, so the failure is appended under it. */
-export function unsentLines(body: string, width: number): Line[] {
-  return [[col(theme.error, `${INDENT}${glyph.result}  not sent: `), col(theme.dim, `"${clip(body || "(attachment)", Math.max(10, width - 30))}" · /retry`)]]
+export function unsentLines(body: string, width: number, reason: string): Line[] {
+  const head = `${INDENT}${glyph.result}  not sent (${clip(reason, Math.max(8, Math.floor(width / 3)))}): `
+  return [[col(theme.error, head), col(theme.dim, `"${clip(body || "(attachment)", Math.max(6, width - displayWidth(head) - 2))}"`)]]
+}
+
+/** Said once when the link comes back and the queue empties itself. */
+export function resentLines(count: number, width: number): Line[] {
+  return [[col(theme.ok, `${INDENT}${glyph.result}  sent ${count} message${count === 1 ? "" : "s"} that had been waiting`)]]
 }
 
 /** True when enough silence sits between two messages to be worth a clock. */

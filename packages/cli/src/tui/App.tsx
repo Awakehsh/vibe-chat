@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { AUTO_STATUS_EMOJI, autoStatusText, runningAgents } from "../autostatus.ts"
 import { Client, loadClient } from "../client.ts"
 import { saveConfig } from "../config.ts"
-import { RequestError } from "../connection.ts"
+import { ConnectionError, RequestError } from "../connection.ts"
 import { configDir } from "../config.ts"
 import { createIdentity, type Identity } from "../identity.ts"
 import { createNotifier } from "../notify.ts"
@@ -31,6 +31,7 @@ import {
   isGap,
   messageLines,
   reactionLines,
+  resentLines,
   unreadLines,
   unsentLines,
   type Line,
@@ -103,6 +104,7 @@ export function App(props: AppProps) {
   /** What the server never took, in the order it was typed; /retry drains it. */
   const unsent = useRef<{ roomId: string; body: string; opts: SendOpts }[]>([])
   const saveDir = useRef(".")
+  const draining = useRef(false)
   /** Scrollback writes happen in order, including the asynchronous ones (markdown, images). */
   const queue = useRef(Promise.resolve())
   const liveRowsRef = useRef(4)
@@ -186,6 +188,43 @@ export function App(props: AppProps) {
       lastPrinted.current.set(m.roomId, m)
     },
     [print, printAsync, renderer, width],
+  )
+
+  /** Sends, and when the server never took it, says so under the line already printed. */
+  const sendMessage = useCallback(
+    async (c: Client, roomId: string, body: string, opts: SendOpts = {}): Promise<boolean> => {
+      try {
+        await c.send(roomId, body, opts)
+        return true
+      } catch (e) {
+        // A link that is down comes back; a server that said no will say no again.
+        const again = e instanceof ConnectionError || (e instanceof RequestError && e.code === "internal")
+        if (again) unsent.current.push({ roomId, body, opts })
+        // "not connected" is how a closed socket reports itself; offline is what it means.
+        const said = e instanceof RequestError ? (e.code === "internal" ? "offline" : e.message) : e instanceof ConnectionError ? "offline" : e instanceof Error ? e.message : "failed"
+        print(unsentLines(body, width(), again ? `${said} · queued` : said))
+        return false
+      }
+    },
+    [print, width],
+  )
+
+  /** Everything that was waiting, once a server is reachable again. */
+  const drainUnsent = useCallback(
+    async (c: Client) => {
+      const pending = unsent.current
+      if (pending.length === 0 || draining.current) return
+      draining.current = true
+      unsent.current = []
+      try {
+        let ok = 0
+        for (const u of pending) if (await sendMessage(c, u.roomId, u.body, u.opts)) ok++
+        if (ok > 0) print(resentLines(ok, width()))
+      } finally {
+        draining.current = false
+      }
+    },
+    [sendMessage, print, width],
   )
 
   const replayRoom = useCallback(
@@ -315,6 +354,7 @@ export function App(props: AppProps) {
       c.onState((host, state, detail) => {
         setLinks((l) => ({ ...l, [host]: state }))
         if (state === "closed" && detail) flash(`${host}: ${detail}`, 8000)
+        if (state === "online") void drainUnsent(c)
       })
       const failures = await c.connectAll()
       if (cancelled) return
@@ -327,7 +367,7 @@ export function App(props: AppProps) {
     return () => {
       cancelled = true
     }
-  }, [identity, client, props.insecure, props.notifications, props.version, notifier, chime, flash, print, printMessage, width])
+  }, [identity, client, props.insecure, props.notifications, props.version, notifier, chime, flash, print, printMessage, width, drainUnsent])
 
   useEffect(
     () => () => {
@@ -409,19 +449,6 @@ export function App(props: AppProps) {
     }
     applyFooter()
   }, [renderer, identity, rows, liveRows, tick, applyFooter])
-
-  /** Sends, and when the server never took it, says so under the line already printed. */
-  const sendMessage = useCallback(
-    async (c: Client, roomId: string, body: string, opts: SendOpts = {}) => {
-      try {
-        await c.send(roomId, body, opts)
-      } catch {
-        unsent.current.push({ roomId, body, opts })
-        print(unsentLines(body, width()))
-      }
-    },
-    [print, width],
-  )
 
   const exit = useCallback(() => {
     client?.close()
@@ -523,7 +550,26 @@ export function App(props: AppProps) {
             return
           }
           case "server": {
-            if (!cmd.rest) return out("/server", [`default: ${client.config.defaultHost ?? "none"}`, ...client.config.hosts.map((h) => `${h}${links[h] ? ` (${links[h]})` : ""}`)])
+            const local = /^local(?:\s+(\d+|off))?$/.exec(cmd.rest.trim())
+            if (local) {
+              if (!room) return flash("no room selected")
+              const host = room.host
+              const aliases = { ...(client.config.hostAliases ?? {}) }
+              if (local[1] === "off") delete aliases[host]
+              else aliases[host] = `127.0.0.1:${local[1] ?? "7788"}`
+              client.config.hostAliases = aliases
+              await saveConfig(client.config, configDir())
+              return out("/server local", [
+                local[1] === "off" ? `${host} is reached by name again` : `${host} will be reached at ${aliases[host]}`,
+                "restart vibechat to use it",
+              ])
+            }
+            if (!cmd.rest)
+              return out("/server", [
+                `default: ${client.config.defaultHost ?? "none"}`,
+                ...client.config.hosts.map((h) => `${h}${client.config.hostAliases?.[h] ? ` via ${client.config.hostAliases[h]}` : ""}${links[h] ? ` (${links[h]})` : ""}`),
+                "/server local [port] · reach the server on this machine directly",
+              ])
             await client.setDefaultHost(cmd.rest)
             return flash(`default server: ${cmd.rest}`)
           }
@@ -729,11 +775,8 @@ export function App(props: AppProps) {
             return
           }
           case "retry": {
-            const pending = unsent.current
-            if (pending.length === 0) return flash("nothing to retry")
-            unsent.current = []
-            for (const u of pending) await sendMessage(client, u.roomId, u.body, u.opts)
-            return
+            if (unsent.current.length === 0) return flash("nothing to retry")
+            return drainUnsent(client)
           }
           case "search": {
             if (!room) return flash("no room selected")
