@@ -51,6 +51,7 @@ export interface AppProps {
 /** How many messages a room switch replays when nothing from it was printed yet. */
 const REPLAY_COUNT = 30
 const PICK_COUNT = 12
+const SEARCH_HITS = 12
 const UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 const IMAGE_COLS = 48
 const IMAGE_ROWS = 14
@@ -155,6 +156,8 @@ export function App(props: AppProps) {
 
   const printMessage = useCallback(
     (c: Client, m: Message) => {
+      printedSeq.current.set(m.roomId, Math.max(printedSeq.current.get(m.roomId) ?? 0, m.seq))
+      if (c.config.blocked.includes(m.authorId)) return
       const w = width()
       const prev = lastPrinted.current.get(m.roomId)
       if (prev && isGap(prev, m)) print(gapLines(m.createdAt, w))
@@ -181,7 +184,6 @@ export function App(props: AppProps) {
         })
       }
       lastPrinted.current.set(m.roomId, m)
-      printedSeq.current.set(m.roomId, Math.max(printedSeq.current.get(m.roomId) ?? 0, m.seq))
     },
     [print, printAsync, renderer, width],
   )
@@ -295,7 +297,7 @@ export function App(props: AppProps) {
             printMessage(c, e.message)
             if (focused.current) c.markRead(e.roomId)
           }
-          if (!e.own) {
+          if (!e.own && !c.config.blocked.includes(e.message.authorId) && !c.config.mutedRooms.includes(e.roomId)) {
             const mention = isMention(e.message, c.identity.name)
             if (mention && c.config.sounds) chime.play()
             if (props.notifications && (!focused.current || e.roomId !== activeRef.current || mention)) {
@@ -445,6 +447,13 @@ export function App(props: AppProps) {
     }
     if (key.ctrl && key.name === "k" && client) setPicker((p) => (p === "rooms" ? undefined : "rooms"))
     if (key.ctrl && key.name === "l") clearScreen()
+    if (key.ctrl && key.name === "n" && client) {
+      const rooms = client.model.roomList()
+      const from = rooms.findIndex((r) => r.room.roomId === activeRef.current)
+      const next = [...rooms.slice(from + 1), ...rooms.slice(0, Math.max(0, from + 1))].find((r) => r.unread > 0)
+      if (next) setActiveRoomId(next.room.roomId)
+      else flash("nothing unread elsewhere")
+    }
   })
 
   const pickable = useCallback(
@@ -496,7 +505,7 @@ export function App(props: AppProps) {
           case "help":
             return out("/help", [
               ...COMMANDS.map((c) => `/${c.name} ${c.args}`.padEnd(38) + c.description),
-              "Enter send · Shift+Enter newline · Ctrl+K rooms · Ctrl+L clear · Esc cancel · Ctrl+C twice quit",
+              "Enter send · Shift+Enter newline · Ctrl+K rooms · Ctrl+N next unread · Ctrl+L clear · Esc cancel · Ctrl+C twice quit",
               "drag a file into the window to send it · scroll with your terminal",
             ])
           case "rooms":
@@ -726,6 +735,45 @@ export function App(props: AppProps) {
             for (const u of pending) await sendMessage(client, u.roomId, u.body, u.opts)
             return
           }
+          case "search": {
+            if (!room) return flash("no room selected")
+            const q = cmd.rest.trim().toLowerCase()
+            if (!q) return flash("usage: /search <text>")
+            const hits = room.messages.filter((m) => m.seq > 0 && !m.deletedAt && m.body.toLowerCase().includes(q))
+            if (hits.length === 0) return out(`/search ${cmd.rest}`, [`nothing loaded in this room matches · /history loads older messages`])
+            const shown = hits.slice(-SEARCH_HITS)
+            return out(`/search ${cmd.rest}`, [
+              ...shown.map((m) => `${model.nameOf(m.authorId)}: ${clip(m.body, Math.max(20, width() - 24))}`),
+              `${hits.length} of ${room.messages.length} loaded messages${hits.length > shown.length ? `, newest ${shown.length} shown` : ""}`,
+            ])
+          }
+          case "mute": {
+            if (!room) return flash("no room selected")
+            const id = room.room.roomId
+            const muted = client.config.mutedRooms.includes(id)
+            client.config.mutedRooms = muted ? client.config.mutedRooms.filter((r) => r !== id) : [...client.config.mutedRooms, id]
+            await saveConfig(client.config, configDir())
+            return flash(muted ? `#${model.titleOf(id)} can speak again` : `#${model.titleOf(id)} muted`)
+          }
+          case "block": {
+            if (!room) return flash("no room selected")
+            const target = memberByName(cmd.rest)
+            if (!target) return flash(`no member named "${cmd.rest.replace(/^@/, "")}"`)
+            if (target === identity.publicKey) return flash("you cannot block yourself")
+            if (client.config.blocked.includes(target)) return flash(`${model.nameOf(target)} is already hidden`)
+            client.config.blocked = [...client.config.blocked, target]
+            await saveConfig(client.config, configDir())
+            return flash(`${model.nameOf(target)} hidden · their new messages will not be shown`)
+          }
+          case "unblock": {
+            if (client.config.blocked.length === 0) return flash("nobody is hidden")
+            if (!cmd.rest.trim()) return out("/unblock", client.config.blocked.map((id) => model.nameOf(id)))
+            const target = client.config.blocked.find((id) => model.nameOf(id).toLowerCase() === cmd.rest.trim().replace(/^@/, "").toLowerCase())
+            if (!target) return flash(`"${cmd.rest.trim()}" is not hidden`)
+            client.config.blocked = client.config.blocked.filter((id) => id !== target)
+            await saveConfig(client.config, configDir())
+            return flash(`${model.nameOf(target)} shown again`)
+          }
           case "update": {
             const want = cmd.rest.trim().toLowerCase()
             if (want !== "on" && want !== "off") return out("/update", [`automatic updates are ${client.config.autoUpdate ? "on" : "off"}`, "/update on · /update off"])
@@ -806,7 +854,7 @@ export function App(props: AppProps) {
   const myLast = room ? [...room.messages].reverse().find((m) => m.authorId === identity.publicKey && m.seq > 0) : undefined
   const seenBy = myLast && room ? [...room.members.values()].filter((mb) => mb.userId !== identity.publicKey && mb.lastReadSeq >= myLast.seq).length : 0
   const where = room
-    ? [`#${title}`, `${room.members.size} members`, `${online} online`, myLast && room.members.size > 1 ? `seen by ${seenBy}/${room.members.size - 1}` : "", unreadElsewhere ? `${unreadElsewhere} unread elsewhere` : "", offline.length ? `reconnecting ${offline.join(", ")}` : ""].filter(Boolean).join(" · ")
+    ? [`#${title}`, client?.config.mutedRooms.includes(room.room.roomId) ? "muted" : "", `${room.members.size} members`, `${online} online`, myLast && room.members.size > 1 ? `seen by ${seenBy}/${room.members.size - 1}` : "", unreadElsewhere ? `${unreadElsewhere} unread elsewhere` : "", offline.length ? `reconnecting ${offline.join(", ")}` : ""].filter(Boolean).join(" · ")
     : client
       ? "no room · /server <host> · /new <name> · /join <host/TOKEN>"
       : "connecting…"

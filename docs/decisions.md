@@ -272,3 +272,26 @@ does not mean asking repeatedly.
 
 This does reverse D20's last line. The thing being traded is one request a day
 to the release list, against a fleet that never converges.
+
+## D25 — Four ways to make a room quieter (2026-09)
+
+All four are the client's own business and none of them reaches the wire: the
+server keeps delivering everything, and what changes is what this client does
+with it.
+
+`/search` looks through the messages the room has already loaded and says how
+many of them it looked at, so a miss reads as "not in what is loaded" rather
+than "not said" — `/history` is the way to widen it. Searching the server
+would need a query in the protocol, and a room that fits in memory does not
+need one yet.
+
+`/mute` silences one room rather than the whole client, which is what the
+existing `sounds` switch did, and the footer says `muted` so a quiet room is
+never a mystery. `/block` hides someone: their messages are not printed, not
+replayed, raise nothing, and do not mark the room unread — a hidden author
+that still lights the room up is worse than not blocking at all, since you
+open the room to find nothing there. `Ctrl+N` moves to the next room with
+something waiting, the same order the room list uses.
+
+Blocking is not a moderation tool. The owner's `/kick` is; this only changes
+what you see, and the person on the other end is not told.

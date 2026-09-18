@@ -19,9 +19,13 @@ export interface Config {
   autoUpdate: boolean
   /** When the release list was last asked, so it is asked at most daily. */
   lastUpdateCheck?: string
+  /** Rooms that make no sound and raise no notification. */
+  mutedRooms: string[]
+  /** User ids whose messages are not shown. */
+  blocked: string[]
 }
 
-const DEFAULT_CONFIG: Config = { hosts: [], notifications: true, sounds: true, autoStatus: false, autoUpdate: true }
+const DEFAULT_CONFIG: Config = { hosts: [], notifications: true, sounds: true, autoStatus: false, autoUpdate: true, mutedRooms: [], blocked: [] }
 
 export function configDir(env: NodeJS.ProcessEnv = process.env): string {
   if (env.VIBECHAT_HOME) return env.VIBECHAT_HOME
@@ -33,7 +37,8 @@ export async function loadConfig(dir: string = configDir()): Promise<Config> {
   const f = Bun.file(join(dir, "config.json"))
   if (!(await f.exists())) return { ...DEFAULT_CONFIG }
   const raw = (await f.json()) as Partial<Config>
-  return { ...DEFAULT_CONFIG, ...raw, hosts: Array.isArray(raw.hosts) ? raw.hosts : [] }
+  const list = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [])
+  return { ...DEFAULT_CONFIG, ...raw, hosts: list(raw.hosts), mutedRooms: list(raw.mutedRooms), blocked: list(raw.blocked) }
 }
 
 export async function saveConfig(config: Config, dir: string = configDir()): Promise<void> {

@@ -11,7 +11,7 @@
     },
     "packages/cli": {
       "name": "@vibechat/cli",
-      "version": "0.1.2",
+      "version": "0.7.0",
       "bin": {
         "vibechat": "./src/index.ts",
       },

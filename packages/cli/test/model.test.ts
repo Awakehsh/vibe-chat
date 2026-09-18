@@ -29,6 +29,24 @@ const sync = (over: Partial<SyncResult> = {}): SyncResult => ({
   ...over,
 })
 
+describe("a hidden author", () => {
+  test("does not light the room up", () => {
+    const m = new Model(me)
+    m.applySync("h", sync({ unread: { r1: 0 } }))
+    m.apply("h", { t: "msg", message: msg(4) })
+    expect(m.room("r1")!.unread).toBe(1)
+
+    m.isHidden = (id) => id === bob
+    m.apply("h", { t: "msg", message: msg(5) })
+    expect(m.room("r1")!.unread).toBe(1)
+
+    // Your own messages never counted, and neither does anyone still visible.
+    const ana = "A".repeat(43)
+    m.apply("h", { t: "msg", message: msg(6, ana) })
+    expect(m.room("r1")!.unread).toBe(2)
+  })
+})
+
 describe("Model", () => {
   test("sync populates rooms, users, unread and hasOlder", () => {
     const m = new Model(me)

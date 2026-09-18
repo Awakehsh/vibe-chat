@@ -26,6 +26,9 @@ export class Model {
   readonly users = new Map<string, User>()
   private listeners = new Set<(e: ModelEvent) => void>()
 
+  /** Set by the client from config: a hidden author lights nothing up. */
+  isHidden: (userId: string) => boolean = () => false
+
   constructor(readonly selfId: string) {}
 
   on(fn: (e: ModelEvent) => void): () => void {
@@ -185,7 +188,7 @@ export class Model {
         r.room.lastActivityAt = ev.message.createdAt
         r.typing.delete(ev.message.authorId)
         const own = ev.message.authorId === this.selfId
-        if (!own) r.unread += 1
+        if (!own && !this.isHidden(ev.message.authorId)) r.unread += 1
         this.emit({ type: "message", roomId: r.room.roomId, message: ev.message, own })
         return
       }

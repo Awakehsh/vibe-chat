@@ -25,6 +25,7 @@ export class Client {
 
   constructor(private readonly opts: ClientOptions) {
     this.model = new Model(opts.identity.publicKey)
+    this.model.isHidden = (userId) => this.config.blocked.includes(userId)
     this.config = opts.config
   }
 
