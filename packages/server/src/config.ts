@@ -19,7 +19,7 @@ export function resolveConfig(partial: Partial<ServerConfig> = {}): ServerConfig
     dataDir: partial.dataDir ?? "./data",
     limits: { ...DEFAULT_LIMITS, ...(partial.limits ?? {}) },
     name: partial.name ?? "vibechat",
-    version: partial.version ?? "0.10.0",
+    version: partial.version ?? "0.11.0",
     quiet: partial.quiet ?? false,
   }
 }

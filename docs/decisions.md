@@ -332,3 +332,26 @@ The list is about ninety hand-picked ones with aliases, not all of Unicode.
 A menu you scroll past is not a menu, and the names people reach for — `:+1:`,
 `:thanks:`, `:lol:` — matter more than coverage. A colon only starts one at a
 word boundary, so `10:30` and `https://` are still text.
+
+## D28 — All of them, ranked, rather than ninety (2026-09)
+
+D27 kept the list to about ninety on the grounds that a menu you scroll past
+is not a menu. The list was the wrong thing to shorten: what makes a menu
+usable is the order, not the length. Wanting one that is not in the table is a
+dead end, and the table was full of dead ends.
+
+So the whole GitHub shortcode set is in, 1913 of them, packed as `name:char`
+pairs rather than two thousand object literals. Ranking carries the weight: an
+exact name, then an alias, then names starting with what was typed, then names
+containing it, and within each tier about ninety common ones come first. That
+last part is what stops `:fi` from finding Fiji before fire.
+
+Two things the shortcode set does not give. Its codepoints omit the variation
+selector, so `heart` arrived as a text-style glyph rather than an emoji; it is
+added for a lone codepoint from the older blocks and inside a keycap. And its
+names are not always the ones people type, so the aliases from D27 stay.
+
+A colon now starts a name unless a letter, digit, slash, dot or colon precedes
+it. After an emoji it does, which is how two are typed in a row, and the
+variation selector between them is why the rule is about what may not precede
+rather than what must.

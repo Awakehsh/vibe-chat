@@ -237,14 +237,33 @@ describe("emoji by name", () => {
     expect(typedShortcode("https://x")).toBeUndefined()
     expect(typedShortcode(":fire ")).toBeUndefined()
     expect(typedShortcode("plain text")).toBeUndefined()
+    // One right after another, with no space between them.
+    expect(typedShortcode("🔥:he")).toBe("he")
+    // The variation selector sits between the emoji and the colon.
+    expect(typedShortcode("❤\uFE0F:he")).toBe("he")
+    expect(typedShortcode("word:he")).toBeUndefined()
+    expect(typedShortcode("std::vec")).toBeUndefined()
+    expect(typedShortcode("file.txt:he")).toBeUndefined()
   })
 
-  test("names and aliases both find it, best first", () => {
+  test("names and aliases both find it, and the common one is not buried", () => {
     expect(emojiMatches("fire")[0]!.char).toBe("🔥")
     expect(emojiMatches("+1")[0]!.char).toBe("👍")
     expect(emojiMatches("thanks")[0]!.char).toBe("🙏")
     expect(emojiMatches("lol")[0]!.char).toBe("😂")
+    // Fiji is also four letters and sorts first alphabetically.
+    expect(emojiMatches("fi")[0]!.char).toBe("🔥")
+    expect(emojiMatches("sm")[0]!.name).toBe("smile")
+    expect(emojiMatches("th")[0]!.name).toBe("thinking")
     expect(emojiMatches("zzzzz")).toHaveLength(0)
+  })
+
+  test("the ones that need a variation selector carry it", () => {
+    for (const name of ["heart", "sunny", "warning", "gear"]) {
+      const e = emojiMatches(name)[0]!
+      expect(e.char).toContain("\uFE0F")
+    }
+    expect(emojiMatches("five")[0]!.char).toBe("5\uFE0F\u20E3")
   })
 
   test("choosing one replaces the word being typed, not the message", () => {

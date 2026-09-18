@@ -1,6 +1,7 @@
 import type { KeyEvent, TextareaRenderable } from "@opentui/core"
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
 import { COMMANDS, menuFor, type MenuItem } from "./commands.ts"
+import { displayWidth } from "./scrollback.ts"
 import { glyph, theme } from "./theme.ts"
 
 export interface PromptHandle {
@@ -56,6 +57,10 @@ export const Prompt = forwardRef<
     lastMode.current = mode
     onMode?.(mode)
   }
+
+  // An emoji is not one column wide, so the second column is aligned by what the
+  // terminal will draw rather than by how many code units the label holds.
+  const pad = (text: string, width: number) => text + " ".repeat(Math.max(1, width - displayWidth(text)))
 
   const choose = (item: MenuItem) => {
     setText(item.next)
@@ -150,7 +155,7 @@ export const Prompt = forwardRef<
             return (
               <text key={item.key} bg={isSel ? theme.menuBg : "transparent"}>
                 <span fg={isSel ? theme.accent : theme.dim}>{isSel ? "▶ " : "  "}</span>
-                <span fg={isSel ? theme.menuSelected : theme.accent}>{item.label.padEnd(NAME_COL)}</span>
+                <span fg={isSel ? theme.menuSelected : theme.accent}>{pad(item.label, NAME_COL)}</span>
                 <span fg={isSel ? theme.self : theme.dim}>{item.hint}</span>
               </text>
             )
