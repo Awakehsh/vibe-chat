@@ -17,7 +17,7 @@ export async function send(args: ParsedArgs): Promise<void> {
     const room = client.model.findRoom(roomQuery)
     if (!room) {
       const known = client.model.roomList().map((r) => client.model.titleOf(r.room.roomId))
-      const hint = failures.length ? ` (${failures.map((f) => `${f.host}: ${f.error}`).join("; ")})` : ""
+      const hint = failures.length ? ` (${failures.map((f) => f.error).join("; ")})` : ""
       throw new UsageError(`no room matches "${roomQuery}"; known: ${known.join(", ") || "none"}${hint}`)
     }
     const msg = await client.send(room.room.roomId, body, { kind })

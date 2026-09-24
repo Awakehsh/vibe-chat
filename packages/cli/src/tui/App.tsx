@@ -362,7 +362,7 @@ export function App(props: AppProps) {
       print(headerLines(props.version, c.identity.name, hosts.length ? hosts.join(" · ") : "/server <host[:port]> · /new <name> · /join <host/TOKEN>"))
       clientRef.current = c
       setClient(c)
-      for (const f of failures) flash(`${f.host}: ${f.error}`, 8000)
+      for (const f of failures) flash(f.error, 8000)
     })()
     return () => {
       cancelled = true
