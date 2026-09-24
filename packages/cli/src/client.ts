@@ -38,13 +38,16 @@ export class Client {
     return () => this.stateListeners.delete(fn)
   }
 
-  /** Connects to every configured host. Hosts that fail are reported, not fatal. */
-  async connectAll(): Promise<{ host: string; error: string }[]> {
+  /**
+   * Connects to every configured host. Hosts that fail are reported, not fatal;
+   * with `keepTrying` they go on retrying in the background.
+   */
+  async connectAll(opts: { keepTrying?: boolean } = {}): Promise<{ host: string; error: string }[]> {
     const failures: { host: string; error: string }[] = []
     await Promise.all(
       this.config.hosts.map(async (host) => {
         try {
-          await this.connect(host)
+          await this.connect(host, opts)
         } catch (e) {
           failures.push({ host, error: e instanceof Error ? e.message : String(e) })
         }
@@ -54,7 +57,7 @@ export class Client {
   }
 
   /** Connects to one host (idempotent) and returns its first sync. */
-  async connect(host: string): Promise<SyncResult> {
+  async connect(host: string, { keepTrying = false }: { keepTrying?: boolean } = {}): Promise<SyncResult> {
     const existing = this.connections.get(host)
     if (existing) {
       return new Promise((resolve) => {
@@ -80,9 +83,9 @@ export class Client {
       for (const fn of this.stateListeners) fn(host, s, d)
     })
     try {
-      return await conn.connect()
+      return await conn.connect({ keepTrying })
     } catch (e) {
-      this.connections.delete(host)
+      if (!keepTrying || conn.state === "closed") this.connections.delete(host)
       throw e
     }
   }

@@ -199,3 +199,47 @@ describe("Client against a real server", () => {
     a.close()
   })
 })
+
+describe("a server that is down when the client starts", () => {
+  test("is reported, then its rooms arrive once it is back", async () => {
+    const data = join(dir, "late-server")
+    const late = await startServer({ port: 0, dataDir: data, quiet: true })
+    const port = late.port
+    const lateHost = `127.0.0.1:${port}`
+    const cfg = join(dir, "patient")
+    const identity = await createIdentity("patient", undefined, cfg)
+    const first = new Client({ identity, config: await loadConfig(cfg), configDir: cfg })
+    const room = await first.createRoom(lateHost, "later")
+    first.close()
+    await late.stop()
+
+    const c = new Client({ identity, config: await loadConfig(cfg), configDir: cfg })
+    const failures = await c.connectAll({ keepTrying: true })
+    expect(failures.map((f) => f.host)).toEqual([lateHost])
+    expect(c.model.room(room.roomId)).toBeUndefined()
+
+    const arrived = new Promise<boolean>((resolve) => {
+      const off = c.model.on(() => {
+        if (c.model.room(room.roomId)) {
+          off()
+          resolve(true)
+        }
+      })
+      setTimeout(() => resolve(false), 8000)
+    })
+    const back = await startServer({ port, dataDir: data, quiet: true })
+    expect(await arrived).toBe(true)
+    expect(c.connections.get(lateHost)!.state).toBe("online")
+    c.close()
+    await back.stop()
+  }, 15000)
+
+  test("without keepTrying, gives up and forgets the connection", async () => {
+    const c = await client("impatient")
+    c.config.hosts = ["127.0.0.1:1"]
+    const failures = await c.connectAll()
+    expect(failures).toHaveLength(1)
+    expect(c.connections.has("127.0.0.1:1")).toBe(false)
+    c.close()
+  })
+})

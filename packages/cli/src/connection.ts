@@ -61,6 +61,7 @@ export class Connection {
   private attempts = 0
   private stopped = false
   private everSynced = false
+  private keepTrying = false
   readonly cursors = new Map<string, number>()
   state: ConnectionState = "offline"
   session?: string
@@ -89,9 +90,14 @@ export class Connection {
     this.emit("state", state, detail)
   }
 
-  /** Connects and resolves after the first successful sync. Later reconnects are automatic. */
-  connect(): Promise<SyncResult> {
+  /**
+   * Connects and resolves after the first successful sync. Later reconnects are automatic.
+   * A first attempt that fails rejects; with `keepTrying` the connection also goes on
+   * retrying and emits `synced` when the server is reachable again.
+   */
+  connect(opts: { keepTrying?: boolean } = {}): Promise<SyncResult> {
     this.stopped = false
+    this.keepTrying = opts.keepTrying ?? false
     return new Promise((resolve, reject) => {
       const offSynced = this.on("synced", (r) => {
         offSynced()
@@ -99,7 +105,7 @@ export class Connection {
         resolve(r)
       })
       const offState = this.on("state", (s, detail) => {
-        if (s === "closed") {
+        if (s === "closed" || s === "offline") {
           offSynced()
           offState()
           reject(new ConnectionError(this.host, detail ?? ""))
@@ -180,13 +186,13 @@ export class Connection {
       if (this.state !== "closed") this.setState("closed", reason || `closed (${code})`)
       return
     }
-    // Never reached the first sync: fail fast so the caller can report it. Reconnects only after that.
-    if (!this.everSynced) {
+    // Never reached the first sync: fail fast so the caller can report it, unless it asked to keep trying.
+    if (!this.everSynced && !this.keepTrying) {
       this.stopped = true
       this.setState("closed", reason || `could not connect to ${this.host}`)
       return
     }
-    this.setState("offline", reason || `closed (${code})`)
+    this.setState("offline", reason || (this.everSynced ? `closed (${code})` : `could not connect to ${this.host}`))
     const delay = Math.min(30_000, 1000 * 2 ** Math.min(this.attempts++, 5))
     this.reconnectTimer = setTimeout(() => this.open(), delay)
   }

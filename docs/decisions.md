@@ -355,3 +355,21 @@ A colon now starts a name unless a letter, digit, slash, dot or colon precedes
 it. After an emoji it does, which is how two are typed in a row, and the
 variation selector between them is why the rule is about what may not precede
 rather than what must.
+
+## D29 — A server that is down at start is waited for (2026-09)
+
+A connection only retried once it had synced at least once; a first attempt
+that failed gave up for good. That suits `send`, which should say what went
+wrong and exit, and it was wrong for the chat window. Joining a new Wi-Fi left
+the relay's name unresolvable for a few minutes, vibechat started into that
+window, the error flashed for eight seconds, and the footer then read as if no
+server had ever been set up. Nothing short of a restart brought the rooms back.
+
+The window now keeps retrying the servers it knows, with the same backoff as
+any other outage, and the footer says which ones it is waiting for. The first
+failure is still reported. A server that refuses the identity or speaks
+another protocol is still final. Subcommands keep failing fast.
+
+`/server local` needed an open room to know which server was meant, and there
+is no room when that server is unreachable, which is exactly when the command
+helps. Without a room it now applies to the default server.

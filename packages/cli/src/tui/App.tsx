@@ -356,7 +356,7 @@ export function App(props: AppProps) {
         if (state === "closed" && detail) flash(`${host}: ${detail}`, 8000)
         if (state === "online") void drainUnsent(c)
       })
-      const failures = await c.connectAll()
+      const failures = await c.connectAll({ keepTrying: true })
       if (cancelled) return
       const hosts = c.config.hosts
       print(headerLines(props.version, c.identity.name, hosts.length ? hosts.join(" · ") : "/server <host[:port]> · /new <name> · /join <host/TOKEN>"))
@@ -552,8 +552,8 @@ export function App(props: AppProps) {
           case "server": {
             const local = /^local(?:\s+(\d+|off))?$/.exec(cmd.rest.trim())
             if (local) {
-              if (!room) return flash("no room selected")
-              const host = room.host
+              const host = room?.host ?? client.config.defaultHost
+              if (!host) return flash("no server yet: /server <host[:port]> first")
               const aliases = { ...(client.config.hostAliases ?? {}) }
               if (local[1] === "off") delete aliases[host]
               else aliases[host] = `127.0.0.1:${local[1] ?? "7788"}`
@@ -893,20 +893,22 @@ export function App(props: AppProps) {
   const title = room && model ? model.titleOf(room.room.roomId) : undefined
   const online = room && model ? [...room.members.keys()].filter((id) => model.user(id)?.online).length : 0
   const unreadElsewhere = model ? [...model.rooms.values()].filter((r) => r.room.roomId !== activeRoomId).reduce((n, r) => n + r.unread, 0) : 0
-  const offline = Object.entries(links).filter(([, s]) => s !== "online" && s !== "syncing").map(([h]) => h)
+  const offline = Object.entries(links).filter(([, s]) => s === "connecting" || s === "offline").map(([h]) => h)
   const myLast = room ? [...room.messages].reverse().find((m) => m.authorId === identity.publicKey && m.seq > 0) : undefined
   const seenBy = myLast && room ? [...room.members.values()].filter((mb) => mb.userId !== identity.publicKey && mb.lastReadSeq >= myLast.seq).length : 0
   const where = room
     ? [`#${title}`, client?.config.mutedRooms.includes(room.room.roomId) ? "muted" : "", `${room.members.size} members`, `${online} online`, myLast && room.members.size > 1 ? `seen by ${seenBy}/${room.members.size - 1}` : "", unreadElsewhere ? `${unreadElsewhere} unread elsewhere` : "", offline.length ? `reconnecting ${offline.join(", ")}` : ""].filter(Boolean).join(" · ")
     : client
-      ? "no room · /server <host> · /new <name> · /join <host/TOKEN>"
+      ? offline.length
+        ? `no room yet · reconnecting ${offline.join(", ")}`
+        : "no room · /server <host> · /new <name> · /join <host/TOKEN>"
       : "connecting…"
   const composeHint = compose && model ? `${compose.kind === "reply" ? "↩ replying to" : compose.kind === "edit" ? "✎ editing" : "☺ react to"} ${model.nameOf(compose.message.authorId)}: ${clip(compose.message.body || compose.message.kind, 40)} · Esc cancel` : undefined
   const hint = picker
     ? "↑↓ move · Enter pick · Esc close"
     : (composeHint ??
       (promptMode === "menu" ? "↑↓ select · Tab complete · Enter run · Esc clear" : promptMode === "history" ? "↑↓ history · Enter send" : where))
-  const placeholder = compose ? (compose.kind === "react" ? "type an emoji" : compose.kind === "edit" ? "edit your message" : "your reply") : room ? "type a message · / for commands" : "/server <host> to pick a server, then /new or /join"
+  const placeholder = compose ? (compose.kind === "react" ? "type an emoji" : compose.kind === "edit" ? "edit your message" : "your reply") : room ? "type a message · / for commands" : offline.length ? "waiting for the server to come back" : "/server <host> to pick a server, then /new or /join"
 
   return (
     <box flexDirection="column" width="100%" height="100%">
