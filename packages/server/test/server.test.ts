@@ -353,3 +353,36 @@ describe("presence and rate limits", () => {
     a.close()
   })
 })
+
+describe("sync over a gap wider than syncMessages", () => {
+  let small: RunningServer
+  let smallDir: string
+
+  beforeAll(async () => {
+    smallDir = mkdtempSync(join(tmpdir(), "vibechat-test-"))
+    small = await startServer({ port: 0, dataDir: smallDir, quiet: true, limits: { syncMessages: 3 } as any })
+  })
+
+  afterAll(async () => {
+    await small.stop()
+    rmSync(smallDir, { recursive: true, force: true })
+  })
+
+  test("returns the newest messages and history reaches the rest", async () => {
+    const a = await TestClient.connect(small, "alice")
+    const room = (await expectOk(a.request({ t: "room.create", name: "busy" } as any))).room
+    for (let i = 1; i <= 8; i++) await expectOk(a.request({ t: "msg.send", roomId: room.roomId, body: `m${i}` } as any))
+
+    const fresh = await TestClient.connect(small, "alice", a.identity)
+    const res = await expectOk(fresh.request({ t: "sync", rooms: {} } as any))
+    expect(res.truncated).toEqual([room.roomId])
+    const latest = res.messages[room.roomId]
+    expect(latest.map((m: any) => m.body)).toEqual(["m6", "m7", "m8"])
+
+    const older = await expectOk(fresh.request({ t: "msg.history", roomId: room.roomId, beforeSeq: latest[0].seq, limit: 50 } as any))
+    expect(older.messages.map((m: any) => m.body)).toEqual(["m1", "m2", "m3", "m4", "m5"])
+    expect(older.hasMore).toBe(false)
+    a.close()
+    fresh.close()
+  })
+})

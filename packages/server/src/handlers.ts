@@ -294,10 +294,11 @@ function sync(hub: Hub, ws: Socket, userId: string, frame: Req<"sync">): Result 
     members[room.room_id] = list.map((m) => store.toMember(m))
     for (const m of list) userIds.add(m.user_id)
     const lastSeq = frame.rooms[room.room_id] ?? 0
-    const rows = store.listMessagesAfter(room.room_id, lastSeq, limits.syncMessages + 1)
+    let rows = store.listMessagesAfter(room.room_id, lastSeq, limits.syncMessages + 1)
     if (rows.length > limits.syncMessages) {
       truncated.push(room.room_id)
-      rows.length = limits.syncMessages
+      // The newest ones: `msg.history` can only page backwards from what the client holds.
+      rows = store.listMessagesBefore(room.room_id, room.last_seq + 1, limits.syncMessages)
     }
     messages[room.room_id] = store.toMessages(rows)
     const me = list.find((m) => m.user_id === userId)!

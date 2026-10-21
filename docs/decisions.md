@@ -373,3 +373,17 @@ another protocol is still final. Subcommands keep failing fast.
 `/server local` needed an open room to know which server was meant, and there
 is no room when that server is unreachable, which is exactly when the command
 helps. Without a room it now applies to the default server.
+
+## D30 — A sync that cannot carry everything carries the newest (2026-10)
+
+When a room had missed more than `syncMessages`, `sync` returned the first
+ones after the client's `seq` and flagged the room truncated. The client
+keeps no cursors between runs, so every start asked from zero and got the
+room's first messages. It showed those, and `msg.history` only pages
+backwards, so everything after them was out of reach until someone spoke.
+A reconnect after a long outage had the same gap, just smaller.
+
+Sync now returns the newest `syncMessages` of the missed ones. The gap is
+below what the client holds, which is the side history can walk into. Join
+already worked this way. The client needed no change, and older clients get
+the fix as soon as their server has it.

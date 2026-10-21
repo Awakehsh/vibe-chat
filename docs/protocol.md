@@ -156,6 +156,10 @@ S→C  { "t":"ok", "id":"2",
        "unread": { [roomId]: number } }       // lastSeq - lastReadSeq
 ```
 
+For a truncated room, `messages` holds the newest `syncMessages` of the
+missed ones, so the gap lies below them and `msg.history` with `beforeSeq`
+set to the oldest returned `seq` walks back into it.
+
 Rooms the client knew but is no longer in are simply absent; the client
 drops them. After `sync` the connection is subscribed to all rooms listed
 and starts receiving events.
