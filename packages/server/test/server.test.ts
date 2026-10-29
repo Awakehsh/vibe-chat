@@ -386,3 +386,34 @@ describe("sync over a gap wider than syncMessages", () => {
     fresh.close()
   })
 })
+
+describe("resending with the same clientId", () => {
+  test("returns the first message and tells no one else", async () => {
+    const a = await TestClient.connect(server, "alice")
+    const b = await TestClient.connect(server, "bob")
+    const created = (await expectOk(a.request({ t: "room.create", name: "resend" } as any))).room
+    const roomId = created.roomId
+    await expectOk(b.request({ t: "room.join", invite: created.invite } as any))
+
+    const first = await expectOk(a.request({ t: "msg.send", roomId, body: "once", clientId: "dup" } as any))
+    await b.next((f) => f.t === "msg" && f.message.msgId === first.message.msgId)
+
+    const again = await expectOk(a.request({ t: "msg.send", roomId, body: "once", clientId: "dup" } as any))
+    expect(again.message.msgId).toBe(first.message.msgId)
+    expect(again.message.seq).toBe(first.message.seq)
+    expect(again.message.clientId).toBe("dup")
+    await a.next((f) => f.t === "msg" && f.message.msgId === first.message.msgId)
+    const echo = await a.next((f) => f.t === "msg" && f.message.msgId === first.message.msgId)
+    expect(echo.message.clientId).toBe("dup")
+
+    // The same clientId from another author is another message, and the room's seq moved by one.
+    const other = await expectOk(b.request({ t: "msg.send", roomId, body: "mine", clientId: "dup" } as any))
+    expect(other.message.msgId).not.toBe(first.message.msgId)
+    expect(other.message.seq).toBe(first.message.seq + 1)
+    await b.next((f) => f.t === "msg" && f.message.msgId === other.message.msgId)
+    // Events arrive in order, so a second fan-out of the first message would already be buffered.
+    await expect(b.next((f) => f.t === "msg" && f.message.msgId === first.message.msgId, 100)).rejects.toThrow("timed out")
+    a.close()
+    b.close()
+  })
+})

@@ -138,7 +138,12 @@ Server-side effects of `msg.send`:
 - `attachments` must reference files uploaded to the same room by the same
   user and not yet attached, else `invalid`.
 - `clientId` (≤ 64 chars) is echoed on the resulting `message` so the client
-  can replace its optimistic copy. It is not stored.
+  can replace its optimistic copy. It is stored and identifies the message:
+  a later `msg.send` from the same author in the same room with the same
+  `clientId` creates nothing and replies with the message the first one
+  created (deleted or not), echoed to the sender as a `msg` event as well.
+  The room is not told again. A client that resends after a lost reply
+  reuses the `clientId` of the first attempt.
 
 ## 5. Sync
 

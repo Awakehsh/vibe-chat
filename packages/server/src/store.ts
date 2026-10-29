@@ -43,6 +43,7 @@ export interface MessageRow {
   edited_at: string | null
   deleted_at: string | null
   created_at: string
+  client_id: string | null
 }
 
 export interface FileRow {
@@ -225,6 +226,7 @@ export class Store {
     meta?: Record<string, unknown> | undefined
     replyTo?: string | undefined
     attachments?: Attachment[] | undefined
+    clientId?: string | undefined
   }): MessageRow {
     const msgId = Bun.randomUUIDv7()
     const t = now()
@@ -234,8 +236,8 @@ export class Store {
       const seq = room.last_seq + 1
       this.db.run("UPDATE rooms SET last_seq = ?, last_activity_at = ? WHERE room_id = ?", [seq, t, input.roomId])
       this.db.run(
-        `INSERT INTO messages (msg_id, room_id, seq, author_id, kind, body, meta, reply_to, attachments, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO messages (msg_id, room_id, seq, author_id, kind, body, meta, reply_to, attachments, created_at, client_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           msgId,
           input.roomId,
@@ -247,6 +249,7 @@ export class Store {
           input.replyTo ?? null,
           JSON.stringify(input.attachments ?? []),
           t,
+          input.clientId ?? null,
         ],
       )
       return this.getMessage(msgId)!
@@ -255,6 +258,14 @@ export class Store {
 
   getMessage(msgId: string): MessageRow | undefined {
     return this.db.query<MessageRow, [string]>("SELECT * FROM messages WHERE msg_id = ?").get(msgId) ?? undefined
+  }
+
+  getMessageByClientId(roomId: string, authorId: string, clientId: string): MessageRow | undefined {
+    return (
+      this.db
+        .query<MessageRow, [string, string, string]>("SELECT * FROM messages WHERE room_id = ? AND author_id = ? AND client_id = ?")
+        .get(roomId, authorId, clientId) ?? undefined
+    )
   }
 
   /** Ascending by seq, seq > afterSeq, at most `limit`. */

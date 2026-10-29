@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite"
 import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 
-const SCHEMA_VERSION = 1
+const SCHEMA_VERSION = 2
 
 export function openDatabase(dataDir: string): Database {
   mkdirSync(join(dataDir, "files"), { recursive: true })
@@ -21,6 +21,7 @@ function migrate(db: Database): void {
   if (current >= SCHEMA_VERSION) return
   db.transaction(() => {
     if (current < 1) migrateV1(db)
+    if (current < 2) migrateV2(db)
     db.run("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)", [String(SCHEMA_VERSION)])
   })()
 }
@@ -89,4 +90,10 @@ function migrateV1(db: Database): void {
     created_at   TEXT NOT NULL
   )`)
   db.run("CREATE INDEX files_by_room ON files(room_id)")
+}
+
+/** A resent message carries the clientId of the first attempt; the index is how the server recognises it. */
+function migrateV2(db: Database): void {
+  db.run("ALTER TABLE messages ADD COLUMN client_id TEXT")
+  db.run("CREATE UNIQUE INDEX messages_client_id ON messages (room_id, author_id, client_id) WHERE client_id IS NOT NULL")
 }

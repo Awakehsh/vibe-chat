@@ -387,3 +387,23 @@ Sync now returns the newest `syncMessages` of the missed ones. The gap is
 below what the client holds, which is the side history can walk into. Join
 already worked this way. The client needed no change, and older clients get
 the fix as soon as their server has it.
+
+## D31 — A resend is the same message (2026-10)
+
+A send whose reply is lost to a dropped link looks failed to the client even
+when the server stored it. The queue from D26 then sent it again under a new
+`clientId`, and the room got it twice. A message typed while the link was down
+also reported `not sent` once per failed attempt, so one message read as
+several.
+
+`clientId` is now stored, and unique per author and room. A `msg.send` that
+repeats one answers with the message the first attempt created and does not
+tell the room again. The client keeps the first attempt's `clientId` for
+every resend, and a message it already holds is not added or printed a second
+time. The `not sent` line is printed once per message: a resend that goes
+back in the queue is the same wait, and `/retry` says how many are still
+waiting instead.
+
+Older clients send a fresh `clientId` each time and see no change. Older
+servers ignore the stored id, so a new client against one is no worse than
+before.

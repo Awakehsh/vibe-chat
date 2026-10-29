@@ -318,6 +318,13 @@ function sync(hub: Hub, ws: Socket, userId: string, frame: Req<"sync">): Result 
 function sendMessage(hub: Hub, ws: Socket, userId: string, frame: Req<"msg.send">, memberRoom: (roomId: string) => RoomRow): Result {
   const { store, limits } = hub
   const room = memberRoom(frame.roomId)
+  // A resend after a lost reply: answer with what the first attempt stored, and tell no one else.
+  const earlier = frame.clientId ? store.getMessageByClientId(room.room_id, userId, frame.clientId) : undefined
+  if (earlier) {
+    const own: Message = { ...store.toMessage(earlier), clientId: frame.clientId! }
+    hub.send(ws, { t: "msg", message: own })
+    return { message: own }
+  }
   if (utf8Bytes(frame.body) > limits.messageBytes) throw tooLarge("message too long")
   const kind: MessageKind = frame.kind ?? "text"
   let body = frame.body
@@ -370,7 +377,7 @@ function sendMessage(hub: Hub, ws: Socket, userId: string, frame: Req<"msg.send"
     })
   }
 
-  const row = store.insertMessage({ roomId: room.room_id, authorId: userId, kind, body, meta, replyTo: frame.replyTo, attachments })
+  const row = store.insertMessage({ roomId: room.room_id, authorId: userId, kind, body, meta, replyTo: frame.replyTo, attachments, clientId: frame.clientId })
   const message = store.toMessage(row)
   hub.publishRoom(room.room_id, { t: "msg", message }, ws)
   const own: Message = frame.clientId ? { ...message, clientId: frame.clientId } : message
