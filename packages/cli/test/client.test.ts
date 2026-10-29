@@ -198,6 +198,16 @@ describe("Client against a real server", () => {
     expect(a.model.room(room.roomId)!.messages.filter((m) => m.seq === 0)).toHaveLength(0)
     a.close()
   })
+
+  test("a resend with the first attempt's clientId is stored and held once", async () => {
+    const a = await client("ann")
+    const room = await a.createRoom(host, "resend")
+    const first = await a.send(room.roomId, "hi", { clientId: "fixed" })
+    const again = await a.send(room.roomId, "hi", { clientId: "fixed" })
+    expect(again.msgId).toBe(first.msgId)
+    expect(a.model.room(room.roomId)!.messages.filter((m) => m.body === "hi")).toHaveLength(1)
+    a.close()
+  })
 })
 
 describe("a server that is down when the client starts", () => {

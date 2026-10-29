@@ -214,10 +214,10 @@ export class Client {
     }
   }
 
-  /** Sends a message with an optimistic local copy. Resolves to the confirmed message. */
-  async send(roomId: string, body: string, opts: { kind?: Exclude<MessageKind, "system">; meta?: Record<string, unknown>; replyTo?: string; attachments?: string[] } = {}): Promise<Message> {
+  /** Sends a message with an optimistic local copy. Resolves to the confirmed message. A resend passes the first attempt's `clientId`. */
+  async send(roomId: string, body: string, opts: { kind?: Exclude<MessageKind, "system">; meta?: Record<string, unknown>; replyTo?: string; attachments?: string[]; clientId?: string } = {}): Promise<Message> {
     const conn = this.conn(roomId)
-    const clientId = Bun.randomUUIDv7()
+    const clientId = opts.clientId ?? Bun.randomUUIDv7()
     const kind = opts.kind ?? "text"
     const optimistic: Message = {
       msgId: `local:${clientId}`,

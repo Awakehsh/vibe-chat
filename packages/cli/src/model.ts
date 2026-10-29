@@ -182,8 +182,14 @@ export class Model {
         const r = this.rooms.get(ev.message.roomId)
         if (!r) return
         const idx = ev.message.clientId ? r.messages.findIndex((m) => m.clientId === ev.message.clientId && m.seq === 0) : -1
+        // Already held: a resend whose first attempt landed, and arrived here through sync.
+        if (r.messages.some((m) => m.msgId === ev.message.msgId)) {
+          if (idx >= 0) r.messages.splice(idx, 1)
+          this.emit({ type: "change" })
+          return
+        }
         if (idx >= 0) r.messages[idx] = ev.message
-        else if (!r.messages.some((m) => m.msgId === ev.message.msgId)) r.messages = mergeMessages(r.messages, [ev.message])
+        else r.messages = mergeMessages(r.messages, [ev.message])
         r.room.lastSeq = Math.max(r.room.lastSeq, ev.message.seq)
         r.room.lastActivityAt = ev.message.createdAt
         r.typing.delete(ev.message.authorId)

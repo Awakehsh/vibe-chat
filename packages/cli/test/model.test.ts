@@ -89,6 +89,18 @@ describe("Model", () => {
     expect(m.markRead("r1")).toBeUndefined()
   })
 
+  test("a message already held is not added or announced again; the resend's optimistic copy goes", () => {
+    const m = new Model(me)
+    m.applySync("h", sync())
+    m.apply("h", { t: "msg", message: msg(4, me, { clientId: "c1", body: "hi" }) })
+    const events: string[] = []
+    m.on((e) => events.push(e.type))
+    m.addOptimistic("r1", msg(0, me, { msgId: "local:c1", clientId: "c1", body: "hi" }))
+    m.apply("h", { t: "msg", message: msg(4, me, { clientId: "c1", body: "hi" }) })
+    expect(m.room("r1")!.messages.map((x) => x.seq)).toEqual([2, 3, 4])
+    expect(events).not.toContain("message")
+  })
+
   test("reactions, edits, typing and presence update in place", () => {
     const m = new Model(me)
     m.applySync("h", sync())

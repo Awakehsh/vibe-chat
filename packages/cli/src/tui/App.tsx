@@ -192,14 +192,18 @@ export function App(props: AppProps) {
 
   /** Sends, and when the server never took it, says so under the line already printed. */
   const sendMessage = useCallback(
-    async (c: Client, roomId: string, body: string, opts: SendOpts = {}): Promise<boolean> => {
+    async (c: Client, roomId: string, body: string, opts: SendOpts = {}, resend = false): Promise<boolean> => {
+      // Every attempt carries the first one's clientId, so a resend whose first try did land is not stored twice.
+      const tagged = { ...opts, clientId: opts.clientId ?? Bun.randomUUIDv7() }
       try {
-        await c.send(roomId, body, opts)
+        await c.send(roomId, body, tagged)
         return true
       } catch (e) {
         // A link that is down comes back; a server that said no will say no again.
         const again = e instanceof ConnectionError || (e instanceof RequestError && e.code === "internal")
-        if (again) unsent.current.push({ roomId, body, opts })
+        if (again) unsent.current.push({ roomId, body, opts: tagged })
+        // Said once per message: a resend that goes back in the queue is the same wait, not a new failure.
+        if (resend && again) return false
         // "not connected" is how a closed socket reports itself; offline is what it means.
         const said = e instanceof RequestError ? (e.code === "internal" ? "offline" : e.message) : e instanceof ConnectionError ? "offline" : e instanceof Error ? e.message : "failed"
         print(unsentLines(body, width(), again ? `${said} · queued` : said))
@@ -218,7 +222,7 @@ export function App(props: AppProps) {
       unsent.current = []
       try {
         let ok = 0
-        for (const u of pending) if (await sendMessage(c, u.roomId, u.body, u.opts)) ok++
+        for (const u of pending) if (await sendMessage(c, u.roomId, u.body, u.opts, true)) ok++
         if (ok > 0) print(resentLines(ok, width()))
       } finally {
         draining.current = false
@@ -776,7 +780,9 @@ export function App(props: AppProps) {
           }
           case "retry": {
             if (unsent.current.length === 0) return flash("nothing to retry")
-            return drainUnsent(client)
+            await drainUnsent(client)
+            if (unsent.current.length > 0) flash(`${unsent.current.length} still waiting`)
+            return
           }
           case "search": {
             if (!room) return flash("no room selected")
